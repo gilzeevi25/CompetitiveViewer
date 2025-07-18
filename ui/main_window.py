@@ -8,6 +8,8 @@ from PyQt5.QtWidgets import (
     QDockWidget,
     QComboBox,
     QSlider,
+    QSpinBox,
+    QLabel,
     QListWidget,
     QListWidgetItem,
     QAbstractItemView,
@@ -40,6 +42,9 @@ class MainWindow(QMainWindow):
         self.mep_df = None
         self.ssep_upper_df = None
         self.ssep_lower_df = None
+        self.surgery_meta_df = None
+        self._start_idx = 0
+        self._end_idx = 0
         self._timestamps = []
         self._setup_ui()
 
@@ -68,12 +73,26 @@ class MainWindow(QMainWindow):
         self.surgery_combo.currentTextChanged.connect(self.on_surgery_changed)
         dock_layout.addWidget(self.surgery_combo)
 
+        # Metadata label (date and protocol)
+        self.metadata_label = QLabel("Date: N/A | Protocol: N/A")
+        dock_layout.addWidget(self.metadata_label)
+
         # Timestamp slider
         self.timestamp_slider = QSlider(Qt.Horizontal)
         self.timestamp_slider.setMinimum(0)
         self.timestamp_slider.setMaximum(100)
         self.timestamp_slider.valueChanged.connect(self.on_timestamp_changed)
         dock_layout.addWidget(self.timestamp_slider)
+
+        # Time interval selection
+        self.start_spin = QSpinBox()
+        self.end_spin = QSpinBox()
+        self.start_spin.valueChanged.connect(self.on_interval_changed)
+        self.end_spin.valueChanged.connect(self.on_interval_changed)
+        dock_layout.addWidget(QLabel("Start"))
+        dock_layout.addWidget(self.start_spin)
+        dock_layout.addWidget(QLabel("End"))
+        dock_layout.addWidget(self.end_spin)
 
         # Channel selection list
         self.channel_list = ChannelListWidget()
@@ -106,11 +125,18 @@ class MainWindow(QMainWindow):
     # -----------------------------------------------------
     # Data loading
     # -----------------------------------------------------
-    def load_data(self, mep_df=None, ssep_upper_df=None, ssep_lower_df=None):
+    def load_data(
+        self,
+        mep_df=None,
+        ssep_upper_df=None,
+        ssep_lower_df=None,
+        surgery_meta_df=None,
+    ):
         """Store dataframes and populate controls."""
         self.mep_df = mep_df
         self.ssep_upper_df = ssep_upper_df
         self.ssep_lower_df = ssep_lower_df
+        self.surgery_meta_df = surgery_meta_df
 
         surgeries = set()
         for df in (mep_df, ssep_upper_df, ssep_lower_df):
@@ -120,13 +146,24 @@ class MainWindow(QMainWindow):
 
         self._update_channels_for_current_tab()
         self._update_timestamp_slider()
+        self._update_surgery_meta_label()
         self.update_plots()
 
     def on_surgery_changed(self, value):
         self._update_timestamp_slider()
+        self._update_surgery_meta_label()
         self.update_plots()
 
     def on_timestamp_changed(self, value):
+        self.update_plots()
+
+    def on_interval_changed(self, value):
+        self._start_idx = min(self.start_spin.value(), self.end_spin.value())
+        self._end_idx = max(self.start_spin.value(), self.end_spin.value())
+        self.timestamp_slider.setMinimum(self._start_idx)
+        self.timestamp_slider.setMaximum(self._end_idx)
+        if not (self._start_idx <= self.timestamp_slider.value() <= self._end_idx):
+            self.timestamp_slider.setValue(self._start_idx)
         self.update_plots()
 
     def on_channels_changed(self, item):
@@ -183,7 +220,15 @@ class MainWindow(QMainWindow):
         if unique_ts:
             self.timestamp_slider.setMinimum(0)
             self.timestamp_slider.setMaximum(len(unique_ts) - 1)
-            self.timestamp_slider.setValue(0)
+            self.start_spin.setMaximum(len(unique_ts) - 1)
+            self.end_spin.setMaximum(len(unique_ts) - 1)
+            self.start_spin.setValue(0)
+            self.end_spin.setValue(len(unique_ts) - 1)
+            self._start_idx = 0
+            self._end_idx = len(unique_ts) - 1
+            self.timestamp_slider.setMinimum(self._start_idx)
+            self.timestamp_slider.setMaximum(self._end_idx)
+            self.timestamp_slider.setValue(self._start_idx)
         else:
             self.timestamp_slider.setMaximum(0)
 
@@ -207,6 +252,25 @@ class MainWindow(QMainWindow):
                 timestamp,
                 channels,
             )
+
+    def _update_surgery_meta_label(self):
+        if self.surgery_meta_df is None or self.surgery_meta_df.empty:
+            self.metadata_label.setText("Date: N/A | Protocol: N/A")
+            return
+        sid = self.surgery_combo.currentText()
+        if sid in self.surgery_meta_df.index:
+            row = self.surgery_meta_df.loc[sid]
+        elif "surgery_id" in self.surgery_meta_df.columns:
+            row = self.surgery_meta_df[self.surgery_meta_df["surgery_id"] == sid]
+            row = row.iloc[0] if not row.empty else None
+        else:
+            row = None
+        if row is None:
+            self.metadata_label.setText("Date: N/A | Protocol: N/A")
+        else:
+            date = row.get("date", "N/A")
+            protocol = row.get("protocol", "N/A")
+            self.metadata_label.setText(f"Date: {date} | Protocol: {protocol}")
 
 
 if __name__ == "__main__":
