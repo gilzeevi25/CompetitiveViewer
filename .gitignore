@@ -1,8 +1,70 @@
 /dist/
 /build/
 /*.spec
-
-
-# Ignore compiled Python files
-ui/__pycache__/__init__.cpython-312.pyc
+.idea
+# ===== Python artifacts =====
 __pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+# ===== Virtual environments =====
+venv/
+env/
+.venv/
+ENV/
+*.env
+pip-wheel-metadata/
+
+# ===== Jupyter Notebooks checkpoints =====
+.ipynb_checkpoints/
+
+# ===== PyInstaller / packaging =====
+*.spec
+
+# ===== Environment & secrets =====
+.env
+.env.*
+*.secret
+secrets.*
+config.yaml
+config.yml
+
+# ===== Logs & debug =====
+*.log
+*.out
+*.err
+logs/
+debug.log
+
+# ===== IDEs =====
+.vscode/
+.idea/
+
+# ===== OS-specific files =====
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ===== Test & coverage =====
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+*.cover
+.cache/
+pytest_cache/
+nosetests.xml
+test-results/
+
+# ===== Misc =====
+*.bak
+*.swp
+*.tmp
+*.orig
