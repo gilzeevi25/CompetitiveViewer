@@ -11,6 +11,10 @@ class LaunchDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.mep_df = None
+        self.ssep_upper_df = None
+        self.ssep_lower_df = None
+        self.surgery_meta_df = None
         self.setWindowTitle("Select Data File")
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose a .pkl file to load"))
