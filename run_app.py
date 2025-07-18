@@ -13,10 +13,11 @@ def main() -> None:
 
     window = MainWindow()
     if getattr(dialog, "mep_df", None) is not None:
-        surgeries = sorted(dialog.mep_df["surgery_id"].unique())
-        channels = sorted(dialog.mep_df["channel"].unique())
-        window.populate_surgeries(surgeries)
-        window.populate_channels(channels)
+        window.load_data(
+            dialog.mep_df,
+            dialog.ssep_upper_df,
+            dialog.ssep_lower_df,
+        )
         window.trend_tab.refresh({
             "mep_df": dialog.mep_df,
             "ssep_upper_df": dialog.ssep_upper_df,
