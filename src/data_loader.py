@@ -85,8 +85,12 @@ if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python data_loader.py <path_to_pickle>")
     else:
-        paths = load_signals(sys.argv[1])
-        names = ["mep", "ssep_upper", "ssep_lower", "surgery_meta"]
-        for name, df in zip(names, paths):
-            print(f"{name}: {df.shape}")
+try:
+    paths = load_signals(sys.argv[1])
+    names = ["mep", "ssep_upper", "ssep_lower", "surgery_meta"]
+    for name, df in zip(names, paths):
+        print(f"{name}: {df.shape}")
+except (FileNotFoundError, KeyError) as e:
+    print(f"Error: {e}", file=sys.stderr)
+    sys.exit(1)
 
