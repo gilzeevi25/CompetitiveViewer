@@ -4,6 +4,8 @@ from PyQt5.QtWidgets import (
     QDockWidget, QComboBox, QSlider, QListWidget,
     QListWidgetItem
 )
+
+from .trend_view import TrendView
 from PyQt5.QtCore import Qt
 
 
@@ -20,7 +22,8 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(QWidget(), "MEP")
         self.tabs.addTab(QWidget(), "SSEP")
-        self.tabs.addTab(QWidget(), "Trend Analysis")
+        self.trend_tab = TrendView()
+        self.tabs.addTab(self.trend_tab, "Trend Analysis")
         self.setCentralWidget(self.tabs)
 
         # Dock widget on the left for controls
