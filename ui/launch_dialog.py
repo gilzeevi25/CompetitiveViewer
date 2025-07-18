@@ -26,12 +26,17 @@ class LaunchDialog(QDialog):
             "Pickle Files (*.pkl)"
         )
         if not path:
-            sys.exit(0)
-        (
-            self.mep_df,
-            self.ssep_upper_df,
-            self.ssep_lower_df,
-            self.surgery_meta_df,
-        ) = data_loader.load_signals(path)
-        self.accept()
+            return
+
+        try:
+            (
+                self.mep_df,
+                self.ssep_upper_df,
+                self.ssep_lower_df,
+                self.surgery_meta_df,
+            ) = data_loader.load_signals(path)
+            self.accept()
+        except (FileNotFoundError, KeyError) as e:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.critical(self, "Error Loading File", f"An error occurred:\n{e}")
 
