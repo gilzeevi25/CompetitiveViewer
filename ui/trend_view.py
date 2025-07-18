@@ -31,6 +31,7 @@ class TrendView(QWidget):
         self.mep_df = None
         self.ssep_upper_df = None
         self.ssep_lower_df = None
+        self._channel_order = []
 
         self._setup_ui()
 
@@ -73,6 +74,11 @@ class TrendView(QWidget):
         self.ssep_lower_df = data_dict.get("ssep_lower_df")
         self.update_view()
 
+    def set_channel_order(self, channels: list) -> None:
+        """Update the channel ordering used for plotting."""
+        self._channel_order = list(channels)
+        self.update_view()
+
     # -----------------------------------------------------
     # Internal helpers
     # -----------------------------------------------------
@@ -108,7 +114,16 @@ class TrendView(QWidget):
         self.max_label.setText(f"Max: {global_max:.2f}")
         self.mean_label.setText(f"Mean: {global_mean:.2f}")
 
-        for channel in sorted(p2p_df["channel"].unique()):
+        unique_channels = list(p2p_df["channel"].unique())
+        if self._channel_order:
+            channels = [ch for ch in self._channel_order if ch in unique_channels]
+            for ch in unique_channels:
+                if ch not in channels:
+                    channels.append(ch)
+        else:
+            channels = sorted(unique_channels)
+
+        for channel in channels:
             subset = p2p_df[p2p_df["channel"] == channel]
             x = subset["timestamp"].to_list()
             y = subset["p2p"].to_list()
