@@ -90,12 +90,15 @@ class MainWindow(QMainWindow):
         self.surgery_combo.clear()
         self.surgery_combo.addItems([str(s) for s in surgery_ids])
 
-    def populate_channels(self, channels):
+    def populate_channels(self, channels, auto_check=True):
         self.channel_list.clear()
         for ch in channels:
             item = QListWidgetItem(str(ch))
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Unchecked)
+            if auto_check:
+                item.setCheckState(Qt.Checked)
+            else:
+                item.setCheckState(Qt.Unchecked)
             self.channel_list.addItem(item)
         # Emit initial order
         self._emit_channel_order()
