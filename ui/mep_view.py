@@ -52,14 +52,20 @@ class MepView(pg.PlotWidget):
             values = row["values"]
             baseline = row["baseline_values"]
 
-            x_values = list(range(len(values)))
-            x_baseline = list(range(len(baseline)))
+            x_values = [i / row["signal_rate"] for i in range(len(values))]
+            x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
             y_offset = idx * offset_step
 
-            self.plot(x_values,
-                      [v + y_offset for v in values],
-                      pen=pg.mkPen("r"))
+            self.plot(
+                x_values,
+                [v + y_offset for v in values],
+                pen=pg.mkPen("r"),
+            )
             self.plot(x_baseline,
                       [v + y_offset for v in baseline],
                       pen=pg.mkPen("w"))
+
+            text = pg.TextItem(f"{channel} ({row['signal_rate']}Hz)")
+            text.setPos(x_values[-1] if x_values else 0, y_offset)
+            self.addItem(text)
 

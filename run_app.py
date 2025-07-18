@@ -17,6 +17,7 @@ def main() -> None:
             dialog.mep_df,
             dialog.ssep_upper_df,
             dialog.ssep_lower_df,
+            dialog.surgery_meta_df,
         )
         window.trend_tab.refresh({
             "mep_df": dialog.mep_df,
