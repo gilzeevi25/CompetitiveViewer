@@ -1,16 +1,35 @@
 import sys
 from PyQt5.QtWidgets import (
-    QMainWindow, QTabWidget, QWidget, QVBoxLayout,
-    QDockWidget, QComboBox, QSlider, QListWidget,
-    QListWidgetItem
+    QMainWindow,
+    QTabWidget,
+    QWidget,
+    QVBoxLayout,
+    QDockWidget,
+    QComboBox,
+    QSlider,
+    QListWidget,
+    QListWidgetItem,
+    QAbstractItemView,
 )
 
 from .trend_view import TrendView
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
+
+
+class ChannelListWidget(QListWidget):
+    """List widget that emits a signal after internal drag-drop."""
+
+    dropped = pyqtSignal()
+
+    def dropEvent(self, event):
+        super().dropEvent(event)
+        self.dropped.emit()
 
 
 class MainWindow(QMainWindow):
     """Main application window."""
+
+    channelsReordered = pyqtSignal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -47,9 +66,13 @@ class MainWindow(QMainWindow):
         dock_layout.addWidget(self.timestamp_slider)
 
         # Channel selection list
-        self.channel_list = QListWidget()
+        self.channel_list = ChannelListWidget()
+        self.channel_list.setDragDropMode(QAbstractItemView.InternalMove)
         self.channel_list.itemChanged.connect(self.on_channels_changed)
+        self.channel_list.dropped.connect(self._emit_channel_order)
         dock_layout.addWidget(self.channel_list)
+
+        self.channelsReordered.connect(self.trend_tab.set_channel_order)
 
         dock.setWidget(dock_container)
 
@@ -64,6 +87,8 @@ class MainWindow(QMainWindow):
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Unchecked)
             self.channel_list.addItem(item)
+        # Emit initial order
+        self._emit_channel_order()
 
     def on_surgery_changed(self, value):
         print(f"Surgery changed: {value}")
@@ -76,6 +101,10 @@ class MainWindow(QMainWindow):
                             for i in range(self.channel_list.count())
                             if self.channel_list.item(i).checkState() == Qt.Checked]
         print(f"Channels changed: {checked_channels}")
+
+    def _emit_channel_order(self):
+        order = [self.channel_list.item(i).text() for i in range(self.channel_list.count())]
+        self.channelsReordered.emit(order)
 
 
 if __name__ == "__main__":
