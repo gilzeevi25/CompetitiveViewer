@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QLabel,
+    QComboBox,
 )
 import pyqtgraph as pg
 
@@ -35,6 +36,10 @@ class TrendView(QWidget):
 
         self._setup_ui()
 
+    def _on_source_changed(self) -> None:
+        self._update_timestamp_combos()
+        self.update_view()
+
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
 
@@ -46,15 +51,27 @@ class TrendView(QWidget):
         group = QButtonGroup(self)
         group.addButton(self.mep_radio)
         group.addButton(self.ssep_radio)
-        self.mep_radio.toggled.connect(self.update_view)
-        self.ssep_radio.toggled.connect(self.update_view)
+        self.mep_radio.toggled.connect(self._on_source_changed)
+        self.ssep_radio.toggled.connect(self._on_source_changed)
         radio_layout.addWidget(self.mep_radio)
         radio_layout.addWidget(self.ssep_radio)
         layout.addLayout(radio_layout)
 
+        range_layout = QHBoxLayout()
+        self.start_combo = QComboBox()
+        self.end_combo = QComboBox()
+        self.start_combo.currentTextChanged.connect(self.update_view)
+        self.end_combo.currentTextChanged.connect(self.update_view)
+        range_layout.addWidget(QLabel("Start:"))
+        range_layout.addWidget(self.start_combo)
+        range_layout.addWidget(QLabel("End:"))
+        range_layout.addWidget(self.end_combo)
+        layout.addLayout(range_layout)
+
         # Plot widget
         self.plot = pg.PlotWidget()
         self.plot.showGrid(x=True, y=True, alpha=0.3)
+        self.legend = self.plot.addLegend(offset=(10, 10))
         layout.addWidget(self.plot)
 
         # Stats labels
@@ -67,11 +84,31 @@ class TrendView(QWidget):
         stats_layout.addWidget(self.mean_label)
         layout.addLayout(stats_layout)
 
+    def _update_timestamp_combos(self) -> None:
+        """Populate start/end timestamp combo boxes based on current data."""
+        df = self._current_dataframe()
+        for combo in (self.start_combo, self.end_combo):
+            combo.blockSignals(True)
+            combo.clear()
+            combo.blockSignals(False)
+
+        if df is None or df.empty:
+            return
+
+        timestamps = sorted(df["timestamp"].unique())
+        for t in timestamps:
+            self.start_combo.addItem(str(t), t)
+            self.end_combo.addItem(str(t), t)
+        if timestamps:
+            self.start_combo.setCurrentIndex(0)
+            self.end_combo.setCurrentIndex(len(timestamps) - 1)
+
     def refresh(self, data_dict: dict) -> None:
         """Update internal data and refresh the display."""
         self.mep_df = data_dict.get("mep_df")
         self.ssep_upper_df = data_dict.get("ssep_upper_df")
         self.ssep_lower_df = data_dict.get("ssep_lower_df")
+        self._update_timestamp_combos()
         self.update_view()
 
     def set_channel_order(self, channels: list) -> None:
@@ -98,6 +135,7 @@ class TrendView(QWidget):
     def update_view(self) -> None:
         df = self._current_dataframe()
         self.plot.clear()
+        self.legend.clear()
         if df is None or df.empty:
             self.min_label.setText("Min: N/A")
             self.max_label.setText("Max: N/A")
@@ -105,6 +143,12 @@ class TrendView(QWidget):
             return
 
         p2p_df = calculate_p2p(df)
+
+        # Apply time interval filter
+        start_data = self.start_combo.currentData()
+        end_data = self.end_combo.currentData()
+        if start_data is not None and end_data is not None:
+            p2p_df = p2p_df[(p2p_df["timestamp"] >= start_data) & (p2p_df["timestamp"] <= end_data)]
 
         # Compute stats
         global_min = p2p_df["p2p"].min()
@@ -123,9 +167,10 @@ class TrendView(QWidget):
         else:
             channels = sorted(unique_channels)
 
-        for channel in channels:
+        for idx, channel in enumerate(channels):
             subset = p2p_df[p2p_df["channel"] == channel]
             x = subset["timestamp"].to_list()
             y = subset["p2p"].to_list()
-            self.plot.plot(x, y, pen=pg.mkPen(width=2), name=str(channel))
+            color = pg.intColor(idx, hues=len(channels))
+            self.plot.plot(x, y, pen=pg.mkPen(color, width=2), name=str(channel))
 

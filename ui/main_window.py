@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QAbstractItemView,
+    QLabel,
 )
 
 from .trend_view import TrendView
@@ -40,6 +41,7 @@ class MainWindow(QMainWindow):
         self.mep_df = None
         self.ssep_upper_df = None
         self.ssep_lower_df = None
+        self.surgery_meta_df = None
         self._timestamps = []
         self._setup_ui()
 
@@ -67,6 +69,8 @@ class MainWindow(QMainWindow):
         self.surgery_combo = QComboBox()
         self.surgery_combo.currentTextChanged.connect(self.on_surgery_changed)
         dock_layout.addWidget(self.surgery_combo)
+        self.surgery_meta_label = QLabel()
+        dock_layout.addWidget(self.surgery_meta_label)
 
         # Timestamp slider
         self.timestamp_slider = QSlider(Qt.Horizontal)
@@ -89,6 +93,7 @@ class MainWindow(QMainWindow):
     def populate_surgeries(self, surgery_ids):
         self.surgery_combo.clear()
         self.surgery_combo.addItems([str(s) for s in surgery_ids])
+        self._update_surgery_meta_label()
 
     def populate_channels(self, channels, auto_check=True):
         self.channel_list.clear()
@@ -106,17 +111,25 @@ class MainWindow(QMainWindow):
     # -----------------------------------------------------
     # Data loading
     # -----------------------------------------------------
-    def load_data(self, mep_df=None, ssep_upper_df=None, ssep_lower_df=None):
+    def load_data(
+        self,
+        mep_df=None,
+        ssep_upper_df=None,
+        ssep_lower_df=None,
+        surgery_meta_df=None,
+    ):
         """Store dataframes and populate controls."""
         self.mep_df = mep_df
         self.ssep_upper_df = ssep_upper_df
         self.ssep_lower_df = ssep_lower_df
+        self.surgery_meta_df = surgery_meta_df
 
         surgeries = set()
         for df in (mep_df, ssep_upper_df, ssep_lower_df):
             if df is not None:
                 surgeries.update(df["surgery_id"].unique())
         self.populate_surgeries(sorted(surgeries))
+        self._update_surgery_meta_label()
 
         self._update_channels_for_current_tab()
         self._update_timestamp_slider()
@@ -124,6 +137,7 @@ class MainWindow(QMainWindow):
 
     def on_surgery_changed(self, value):
         self._update_timestamp_slider()
+        self._update_surgery_meta_label()
         self.update_plots()
 
     def on_timestamp_changed(self, value):
@@ -136,6 +150,22 @@ class MainWindow(QMainWindow):
         order = [self.channel_list.item(i).text() for i in range(self.channel_list.count())]
         self.channelsReordered.emit(order)
         self.update_plots()
+
+    def _update_surgery_meta_label(self):
+        """Display surgery date and protocol for the selected surgery."""
+        if self.surgery_meta_df is None or self.surgery_meta_df.empty:
+            self.surgery_meta_label.setText("Date: N/A | Protocol: N/A")
+            return
+
+        surgery_id = self.surgery_combo.currentText()
+        if surgery_id in self.surgery_meta_df.index.astype(str):
+            row = self.surgery_meta_df.loc[self.surgery_meta_df.index.astype(str) == surgery_id].iloc[0]
+            date = row.get("date", "N/A")
+            protocol = row.get("protocol", "N/A")
+        else:
+            date = "N/A"
+            protocol = "N/A"
+        self.surgery_meta_label.setText(f"Date: {date} | Protocol: {protocol}")
 
     # -----------------------------------------------------
     # Internal helpers

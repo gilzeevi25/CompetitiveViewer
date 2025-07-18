@@ -57,8 +57,6 @@ class SsepView(pg.PlotWidget):
         )
         offset_step = all_max * 1.2
 
-        legend_added = set()
-
         for idx, channel in enumerate(channels_ordered):
             row = subset[subset["channel"] == channel]
             if row.empty:
@@ -67,13 +65,14 @@ class SsepView(pg.PlotWidget):
             values = row["values"]
             baseline = row["baseline_values"]
             region = row.get("region", "")
+            rate = row.get("signal_rate", "?")
 
             x_values = list(range(len(values)))
             x_baseline = list(range(len(baseline)))
             y_offset = idx * offset_step
 
             pen_color = "b" if region == "Upper" else "g"
-            name = region if region not in legend_added else None
+            name = f"{channel} ({rate}Hz)"
 
             self.plot(x_values,
                       [v + y_offset for v in values],
@@ -82,6 +81,3 @@ class SsepView(pg.PlotWidget):
             self.plot(x_baseline,
                       [v + y_offset for v in baseline],
                       pen=pg.mkPen("w"))
-
-            if name:
-                legend_added.add(region)
