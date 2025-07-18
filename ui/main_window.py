@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QAbstractItemView,
+    QLabel,
+    QSpinBox,
 )
 
 from .trend_view import TrendView
@@ -40,6 +42,9 @@ class MainWindow(QMainWindow):
         self.mep_df = None
         self.ssep_upper_df = None
         self.ssep_lower_df = None
+        self.surgery_meta_df = None
+        self._sample_start = 0
+        self._sample_end = 0
         self._timestamps = []
         self._setup_ui()
 
@@ -67,6 +72,22 @@ class MainWindow(QMainWindow):
         self.surgery_combo = QComboBox()
         self.surgery_combo.currentTextChanged.connect(self.on_surgery_changed)
         dock_layout.addWidget(self.surgery_combo)
+
+        # Surgery metadata display
+        self.surgery_meta_label = QLabel("")
+        dock_layout.addWidget(self.surgery_meta_label)
+
+        # Sample interval selection
+        self.start_spin = QSpinBox()
+        self.end_spin = QSpinBox()
+        self.start_spin.setRange(0, 0)
+        self.end_spin.setRange(0, 0)
+        self.start_spin.setPrefix("Start ")
+        self.end_spin.setPrefix("End ")
+        self.start_spin.valueChanged.connect(self.on_interval_changed)
+        self.end_spin.valueChanged.connect(self.on_interval_changed)
+        dock_layout.addWidget(self.start_spin)
+        dock_layout.addWidget(self.end_spin)
 
         # Timestamp slider
         self.timestamp_slider = QSlider(Qt.Horizontal)
@@ -106,17 +127,25 @@ class MainWindow(QMainWindow):
     # -----------------------------------------------------
     # Data loading
     # -----------------------------------------------------
-    def load_data(self, mep_df=None, ssep_upper_df=None, ssep_lower_df=None):
+    def load_data(
+        self,
+        mep_df=None,
+        ssep_upper_df=None,
+        ssep_lower_df=None,
+        surgery_meta_df=None,
+    ):
         """Store dataframes and populate controls."""
         self.mep_df = mep_df
         self.ssep_upper_df = ssep_upper_df
         self.ssep_lower_df = ssep_lower_df
+        self.surgery_meta_df = surgery_meta_df
 
         surgeries = set()
         for df in (mep_df, ssep_upper_df, ssep_lower_df):
             if df is not None:
                 surgeries.update(df["surgery_id"].unique())
         self.populate_surgeries(sorted(surgeries))
+        self._update_surgery_meta_display()
 
         self._update_channels_for_current_tab()
         self._update_timestamp_slider()
@@ -124,12 +153,20 @@ class MainWindow(QMainWindow):
 
     def on_surgery_changed(self, value):
         self._update_timestamp_slider()
+        self._update_surgery_meta_display()
         self.update_plots()
 
     def on_timestamp_changed(self, value):
         self.update_plots()
 
     def on_channels_changed(self, item):
+        self.update_plots()
+
+    def on_interval_changed(self, value):
+        if self.end_spin.value() < self.start_spin.value():
+            self.end_spin.setValue(self.start_spin.value())
+        self._sample_start = self.start_spin.value()
+        self._sample_end = self.end_spin.value()
         self.update_plots()
 
     def _emit_channel_order(self):
@@ -156,6 +193,47 @@ class MainWindow(QMainWindow):
         if frames:
             return pd.concat(frames, ignore_index=True)
         return None
+
+    def _update_interval_controls(self, subset: pd.DataFrame) -> None:
+        """Update sample range spin boxes based on the current subset."""
+        if subset is None or subset.empty:
+            self.start_spin.setMinimum(0)
+            self.start_spin.setMaximum(0)
+            self.end_spin.setMinimum(0)
+            self.end_spin.setMaximum(0)
+            self.start_spin.setValue(0)
+            self.end_spin.setValue(0)
+            self._sample_start = 0
+            self._sample_end = 0
+            return
+
+        max_len = int(subset["values"].apply(len).max())
+        self.start_spin.setMinimum(0)
+        self.start_spin.setMaximum(max_len - 1)
+        self.end_spin.setMinimum(0)
+        self.end_spin.setMaximum(max_len - 1)
+        if self.end_spin.value() >= max_len:
+            self.end_spin.setValue(max_len - 1)
+        if self.start_spin.value() >= max_len:
+            self.start_spin.setValue(0)
+        self._sample_start = self.start_spin.value()
+        self._sample_end = self.end_spin.value()
+
+    def _update_surgery_meta_display(self) -> None:
+        """Display date and protocol for the currently selected surgery."""
+        if self.surgery_meta_df is None or self.surgery_meta_df.empty:
+            self.surgery_meta_label.setText("")
+            return
+
+        surgery_id = self.surgery_combo.currentText()
+        row = self.surgery_meta_df[self.surgery_meta_df.index.astype(str) == str(surgery_id)]
+        if row.empty:
+            self.surgery_meta_label.setText("")
+        else:
+            row = row.iloc[0]
+            date = row.get("date", "N/A")
+            protocol = row.get("protocol", "N/A")
+            self.surgery_meta_label.setText(f"Date: {date} | Protocol: {protocol}")
 
     def _update_channels_for_current_tab(self):
         if self.tabs.currentIndex() == 0:
@@ -187,6 +265,8 @@ class MainWindow(QMainWindow):
         else:
             self.timestamp_slider.setMaximum(0)
 
+        self._update_interval_controls(subset)
+
     def update_plots(self):
         channels = [self.channel_list.item(i).text()
                     for i in range(self.channel_list.count())
@@ -198,7 +278,14 @@ class MainWindow(QMainWindow):
         surgery = self.surgery_combo.currentText()
 
         if self.tabs.currentIndex() == 0:
-            self.mep_view.update_view(self.mep_df, surgery, timestamp, channels)
+            self.mep_view.update_view(
+                self.mep_df,
+                surgery,
+                timestamp,
+                channels,
+                self._sample_start,
+                self._sample_end,
+            )
         else:
             self.ssep_view.update_view(
                 self.ssep_upper_df,
@@ -206,6 +293,8 @@ class MainWindow(QMainWindow):
                 surgery,
                 timestamp,
                 channels,
+                self._sample_start,
+                self._sample_end,
             )
 
 

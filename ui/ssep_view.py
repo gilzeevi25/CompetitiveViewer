@@ -10,7 +10,16 @@ class SsepView(pg.PlotWidget):
         self.showGrid(x=True, y=True, alpha=0.3)
         self._legend = self.addLegend(offset=(10, 10))
 
-    def update_view(self, ssep_upper_df, ssep_lower_df, surgery_id, timestamp, channels_ordered):
+    def update_view(
+        self,
+        ssep_upper_df,
+        ssep_lower_df,
+        surgery_id,
+        timestamp,
+        channels_ordered,
+        sample_start=0,
+        sample_end=0,
+    ):
         """Update the plot with SSEP and baseline signals.
 
         Parameters
@@ -66,14 +75,21 @@ class SsepView(pg.PlotWidget):
             row = row.iloc[0]
             values = row["values"]
             baseline = row["baseline_values"]
+            rate = row.get("signal_rate", "?")
             region = row.get("region", "")
+            if sample_end and sample_end > sample_start:
+                values = values[sample_start:sample_end]
+                baseline = baseline[sample_start:sample_end]
+            else:
+                values = values[sample_start:]
+                baseline = baseline[sample_start:]
 
             x_values = list(range(len(values)))
             x_baseline = list(range(len(baseline)))
             y_offset = idx * offset_step
 
             pen_color = "b" if region == "Upper" else "g"
-            name = region if region not in legend_added else None
+            name = f"{channel} ({rate} Hz)"
 
             self.plot(x_values,
                       [v + y_offset for v in values],
@@ -83,5 +99,5 @@ class SsepView(pg.PlotWidget):
                       [v + y_offset for v in baseline],
                       pen=pg.mkPen("w"))
 
-            if name:
+            if region not in legend_added:
                 legend_added.add(region)

@@ -7,8 +7,17 @@ class MepView(pg.PlotWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.showGrid(x=True, y=True, alpha=0.3)
+        self._legend = self.addLegend(offset=(10, 10))
 
-    def update_view(self, mep_df, surgery_id, timestamp, channels_ordered):
+    def update_view(
+        self,
+        mep_df,
+        surgery_id,
+        timestamp,
+        channels_ordered,
+        sample_start=0,
+        sample_end=0,
+    ):
         """Update the plot with MEP and baseline signals.
 
         Parameters
@@ -22,8 +31,10 @@ class MepView(pg.PlotWidget):
         channels_ordered : list
             Channels in the order they should be stacked.
         """
-        # Clear previous content
+        # Clear previous content and legend entries
         self.clear()
+        if self._legend is not None:
+            self._legend.clear()
 
         if mep_df is None or mep_df.empty:
             return
@@ -51,14 +62,23 @@ class MepView(pg.PlotWidget):
             row = row.iloc[0]
             values = row["values"]
             baseline = row["baseline_values"]
+            rate = row.get("signal_rate", "?")
+            if sample_end and sample_end > sample_start:
+                values = values[sample_start:sample_end]
+                baseline = baseline[sample_start:sample_end]
+            else:
+                values = values[sample_start:]
+                baseline = baseline[sample_start:]
 
             x_values = list(range(len(values)))
             x_baseline = list(range(len(baseline)))
             y_offset = idx * offset_step
 
+            name = f"{channel} ({rate} Hz)"
             self.plot(x_values,
                       [v + y_offset for v in values],
-                      pen=pg.mkPen("r"))
+                      pen=pg.mkPen("r"),
+                      name=name)
             self.plot(x_baseline,
                       [v + y_offset for v in baseline],
                       pen=pg.mkPen("w"))
