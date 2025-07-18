@@ -1,12 +1,32 @@
 import pyqtgraph as pg
+from PyQt5 import QtCore
+
+
+class DraggableLabel(pg.TextItem):
+    """Text item that can be dragged vertically."""
+
+    moved = QtCore.pyqtSignal()
+
+    def __init__(self, text: str):
+        super().__init__(text, anchor=(0, 0))
+        self.setFlag(self.ItemIsMovable, True)
+        self.setFlag(self.ItemIgnoresTransformations, True)
+
+    def mouseDragEvent(self, event):
+        super().mouseDragEvent(event)
+        if event.isFinish():
+            self.moved.emit()
 
 
 class MepView(pg.PlotWidget):
     """Widget for displaying MEP signals."""
 
+    orderChanged = QtCore.pyqtSignal(list)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.showGrid(x=True, y=True, alpha=0.3)
+        self._labels = []
 
     def update_view(self, mep_df, surgery_id, timestamp, channels_ordered):
         """Update the plot with MEP and baseline signals.
@@ -24,6 +44,7 @@ class MepView(pg.PlotWidget):
         """
         # Clear previous content
         self.clear()
+        self._labels = []
 
         if mep_df is None or mep_df.empty:
             return
@@ -62,4 +83,14 @@ class MepView(pg.PlotWidget):
             self.plot(x_baseline,
                       [v + y_offset for v in baseline],
                       pen=pg.mkPen("w"))
+
+            label = DraggableLabel(f"{channel} ({row['signal_rate']}Hz)")
+            label.setPos(0, y_offset)
+            label.moved.connect(self._emit_new_order)
+            self.addItem(label)
+            self._labels.append((label, channel))
+
+    def _emit_new_order(self):
+        order = [ch for label, ch in sorted(self._labels, key=lambda p: p[0].pos().y())]
+        self.orderChanged.emit(order)
 

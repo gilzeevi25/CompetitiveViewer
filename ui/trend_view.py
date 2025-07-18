@@ -55,6 +55,7 @@ class TrendView(QWidget):
         # Plot widget
         self.plot = pg.PlotWidget()
         self.plot.showGrid(x=True, y=True, alpha=0.3)
+        self.legend = self.plot.addLegend(offset=(10, 10))
         layout.addWidget(self.plot)
 
         # Stats labels
@@ -98,6 +99,8 @@ class TrendView(QWidget):
     def update_view(self) -> None:
         df = self._current_dataframe()
         self.plot.clear()
+        if self.legend is not None:
+            self.legend.clear()
         if df is None or df.empty:
             self.min_label.setText("Min: N/A")
             self.max_label.setText("Max: N/A")
@@ -123,9 +126,11 @@ class TrendView(QWidget):
         else:
             channels = sorted(unique_channels)
 
-        for channel in channels:
+        color_count = len(channels)
+        for idx, channel in enumerate(channels):
             subset = p2p_df[p2p_df["channel"] == channel]
             x = subset["timestamp"].to_list()
             y = subset["p2p"].to_list()
-            self.plot.plot(x, y, pen=pg.mkPen(width=2), name=str(channel))
+            pen = pg.mkPen(color=pg.intColor(idx, hues=color_count), width=2)
+            self.plot.plot(x, y, pen=pen, name=str(channel))
 

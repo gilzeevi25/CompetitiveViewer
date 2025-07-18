@@ -1,14 +1,34 @@
 import pandas as pd
 import pyqtgraph as pg
+from PyQt5 import QtCore
+
+
+class DraggableLabel(pg.TextItem):
+    """Text item that can be dragged vertically."""
+
+    moved = QtCore.pyqtSignal()
+
+    def __init__(self, text: str):
+        super().__init__(text, anchor=(0, 0))
+        self.setFlag(self.ItemIsMovable, True)
+        self.setFlag(self.ItemIgnoresTransformations, True)
+
+    def mouseDragEvent(self, event):
+        super().mouseDragEvent(event)
+        if event.isFinish():
+            self.moved.emit()
 
 
 class SsepView(pg.PlotWidget):
     """Widget for displaying SSEP signals."""
 
+    orderChanged = QtCore.pyqtSignal(list)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.showGrid(x=True, y=True, alpha=0.3)
         self._legend = self.addLegend(offset=(10, 10))
+        self._labels = []
 
     def update_view(self, ssep_upper_df, ssep_lower_df, surgery_id, timestamp, channels_ordered):
         """Update the plot with SSEP and baseline signals.
@@ -28,6 +48,7 @@ class SsepView(pg.PlotWidget):
         """
         # Clear previous content and legend entries
         self.clear()
+        self._labels = []
         if self._legend is not None:
             self._legend.clear()
 
@@ -85,3 +106,13 @@ class SsepView(pg.PlotWidget):
 
             if name:
                 legend_added.add(region)
+            
+            label = DraggableLabel(f"{channel} ({row['signal_rate']}Hz)")
+            label.setPos(0, y_offset)
+            label.moved.connect(self._emit_new_order)
+            self.addItem(label)
+            self._labels.append((label, channel))
+
+    def _emit_new_order(self):
+        order = [ch for label, ch in sorted(self._labels, key=lambda p: p[0].pos().y())]
+        self.orderChanged.emit(order)

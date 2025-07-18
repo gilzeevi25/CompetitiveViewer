@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QAbstractItemView,
+    QLabel,
 )
 
 from .trend_view import TrendView
@@ -40,6 +41,7 @@ class MainWindow(QMainWindow):
         self.mep_df = None
         self.ssep_upper_df = None
         self.ssep_lower_df = None
+        self.surgery_meta_df = None
         self._timestamps = []
         self._setup_ui()
 
@@ -55,6 +57,9 @@ class MainWindow(QMainWindow):
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.setCentralWidget(self.tabs)
 
+        self.mep_view.orderChanged.connect(self._on_view_order_changed)
+        self.ssep_view.orderChanged.connect(self._on_view_order_changed)
+
         # Dock widget on the left for controls
         dock = QDockWidget("Controls", self)
         dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
@@ -67,6 +72,10 @@ class MainWindow(QMainWindow):
         self.surgery_combo = QComboBox()
         self.surgery_combo.currentTextChanged.connect(self.on_surgery_changed)
         dock_layout.addWidget(self.surgery_combo)
+        self.date_label = QLabel("Date: N/A")
+        self.protocol_label = QLabel("Protocol: N/A")
+        dock_layout.addWidget(self.date_label)
+        dock_layout.addWidget(self.protocol_label)
 
         # Timestamp slider
         self.timestamp_slider = QSlider(Qt.Horizontal)
@@ -74,6 +83,14 @@ class MainWindow(QMainWindow):
         self.timestamp_slider.setMaximum(100)
         self.timestamp_slider.valueChanged.connect(self.on_timestamp_changed)
         dock_layout.addWidget(self.timestamp_slider)
+
+        # Interval selection
+        self.interval_start = QComboBox()
+        self.interval_end = QComboBox()
+        self.interval_start.currentIndexChanged.connect(self._update_slider_range)
+        self.interval_end.currentIndexChanged.connect(self._update_slider_range)
+        dock_layout.addWidget(self.interval_start)
+        dock_layout.addWidget(self.interval_end)
 
         # Channel selection list
         self.channel_list = ChannelListWidget()
@@ -106,24 +123,29 @@ class MainWindow(QMainWindow):
     # -----------------------------------------------------
     # Data loading
     # -----------------------------------------------------
-    def load_data(self, mep_df=None, ssep_upper_df=None, ssep_lower_df=None):
+    def load_data(self, mep_df=None, ssep_upper_df=None, ssep_lower_df=None, surgery_meta_df=None):
         """Store dataframes and populate controls."""
         self.mep_df = mep_df
         self.ssep_upper_df = ssep_upper_df
         self.ssep_lower_df = ssep_lower_df
+        self.surgery_meta_df = surgery_meta_df
 
         surgeries = set()
         for df in (mep_df, ssep_upper_df, ssep_lower_df):
             if df is not None:
                 surgeries.update(df["surgery_id"].unique())
+        if surgery_meta_df is not None and not surgery_meta_df.empty:
+            surgeries.update(surgery_meta_df['surgery_id'].astype(str).unique())
         self.populate_surgeries(sorted(surgeries))
 
         self._update_channels_for_current_tab()
         self._update_timestamp_slider()
+        self._update_metadata_display()
         self.update_plots()
 
     def on_surgery_changed(self, value):
         self._update_timestamp_slider()
+        self._update_metadata_display()
         self.update_plots()
 
     def on_timestamp_changed(self, value):
@@ -136,6 +158,17 @@ class MainWindow(QMainWindow):
         order = [self.channel_list.item(i).text() for i in range(self.channel_list.count())]
         self.channelsReordered.emit(order)
         self.update_plots()
+
+    def _on_view_order_changed(self, order):
+        states = {self.channel_list.item(i).text(): self.channel_list.item(i).checkState()
+                  for i in range(self.channel_list.count())}
+        self.channel_list.clear()
+        for ch in order:
+            item = QListWidgetItem(ch)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(states.get(ch, Qt.Checked))
+            self.channel_list.addItem(item)
+        self._emit_channel_order()
 
     # -----------------------------------------------------
     # Internal helpers
@@ -157,6 +190,35 @@ class MainWindow(QMainWindow):
             return pd.concat(frames, ignore_index=True)
         return None
 
+    def _update_metadata_display(self):
+        if self.surgery_meta_df is None or self.surgery_meta_df.empty:
+            self.date_label.setText("Date: N/A")
+            self.protocol_label.setText("Protocol: N/A")
+            return
+        sid = self.surgery_combo.currentText()
+        row = self.surgery_meta_df[self.surgery_meta_df['surgery_id'].astype(str) == str(sid)]
+        if row.empty:
+            self.date_label.setText("Date: N/A")
+            self.protocol_label.setText("Protocol: N/A")
+            return
+        row = row.iloc[0]
+        date = row.get('date', row.get('Date', 'N/A'))
+        protocol = row.get('protocol', row.get('Protocol', 'N/A'))
+        self.date_label.setText(f"Date: {date}")
+        self.protocol_label.setText(f"Protocol: {protocol}")
+
+    def _update_slider_range(self):
+        if not self._timestamps:
+            return
+        start = self.interval_start.currentIndex()
+        end = self.interval_end.currentIndex()
+        if start > end:
+            start, end = end, start
+        self.timestamp_slider.setMinimum(start)
+        self.timestamp_slider.setMaximum(end)
+        if self.timestamp_slider.value() < start or self.timestamp_slider.value() > end:
+            self.timestamp_slider.setValue(start)
+
     def _update_channels_for_current_tab(self):
         if self.tabs.currentIndex() == 0:
             df = self.mep_df
@@ -175,15 +237,22 @@ class MainWindow(QMainWindow):
         if df is None or df.empty:
             self._timestamps = []
             self.timestamp_slider.setMaximum(0)
+            self.interval_start.clear()
+            self.interval_end.clear()
             return
         surgery = self.surgery_combo.currentText()
         subset = df[df["surgery_id"] == surgery]
         unique_ts = sorted(subset["timestamp"].unique())
         self._timestamps = unique_ts
+        self.interval_start.clear()
+        self.interval_end.clear()
+        for ts in unique_ts:
+            self.interval_start.addItem(str(ts))
+            self.interval_end.addItem(str(ts))
         if unique_ts:
-            self.timestamp_slider.setMinimum(0)
-            self.timestamp_slider.setMaximum(len(unique_ts) - 1)
-            self.timestamp_slider.setValue(0)
+            self.interval_start.setCurrentIndex(0)
+            self.interval_end.setCurrentIndex(len(unique_ts) - 1)
+            self._update_slider_range()
         else:
             self.timestamp_slider.setMaximum(0)
 
