@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QDialog
 
 from ui.launch_dialog import LaunchDialog
 from ui.main_window import MainWindow
@@ -8,11 +8,11 @@ from ui.main_window import MainWindow
 def main() -> None:
     app = QApplication(sys.argv)
     dialog = LaunchDialog()
-    if dialog.exec_() != dialog.Accepted:
+    if dialog.exec_() != QDialog.Accepted:
         sys.exit(0)
 
     window = MainWindow()
-    if dialog.mep_df is not None:
+    if getattr(dialog, "mep_df", None) is not None:
         surgeries = sorted(dialog.mep_df["surgery_id"].unique())
         channels = sorted(dialog.mep_df["channel"].unique())
         window.populate_surgeries(surgeries)
