@@ -6,8 +6,14 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QLabel,
+    QSplitter,
 )
-import pyqtgraph as pg
+from .plot_widgets import (
+    SignalPlotWidget,
+    MEP_PEN,
+    SSEP_U_PEN,
+    SSEP_L_PEN,
+)
 
 
 def calculate_p2p(df: pd.DataFrame) -> pd.DataFrame:
@@ -52,21 +58,26 @@ class TrendView(QWidget):
         radio_layout.addWidget(self.ssep_radio)
         layout.addLayout(radio_layout)
 
-        # Plot widget
-        self.plot = pg.PlotWidget()
-        self.plot.showGrid(x=True, y=True, alpha=0.3)
-        self._legend = self.plot.addLegend()
-        layout.addWidget(self.plot)
+        splitter = QSplitter(Qt.Vertical)
 
-        # Stats labels
-        stats_layout = QHBoxLayout()
+        # Plot widget
+        self.plot = SignalPlotWidget()
+        self._legend = self.plot.addLegend()
+        splitter.addWidget(self.plot)
+
+        # Stats panel
+        stats_widget = QWidget()
+        stats_layout = QHBoxLayout(stats_widget)
         self.min_label = QLabel("Min: N/A")
         self.max_label = QLabel("Max: N/A")
         self.mean_label = QLabel("Mean: N/A")
         stats_layout.addWidget(self.min_label)
         stats_layout.addWidget(self.max_label)
         stats_layout.addWidget(self.mean_label)
-        layout.addLayout(stats_layout)
+        splitter.addWidget(stats_widget)
+        splitter.setStretchFactor(0, 1)
+
+        layout.addWidget(splitter)
 
     def refresh(self, data_dict: dict) -> None:
         """Update internal data and refresh the display."""
@@ -130,6 +141,12 @@ class TrendView(QWidget):
             subset = p2p_df[p2p_df["channel"] == channel]
             x = subset["timestamp"].to_list()
             y = subset["p2p"].to_list()
-            color = pg.intColor(idx, hues=len(channels))
-            self.plot.plot(x, y, pen=pg.mkPen(color, width=2), name=str(channel))
+            if self.mep_radio.isChecked():
+                pen = MEP_PEN
+            else:
+                region = (
+                    subset["region"].iloc[0] if "region" in subset.columns else "Upper"
+                )
+                pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
+            self.plot.plot(x, y, pen=pen, name=str(channel))
 

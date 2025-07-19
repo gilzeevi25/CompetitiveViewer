@@ -6,30 +6,14 @@ from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QDockWidget,
-    QComboBox,
-    QSlider,
-    QSpinBox,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
-    QAbstractItemView,
+    QApplication,
 )
-
+from PyQt5.QtCore import Qt, pyqtSignal
+from style import apply_dark_theme
+from .controls_dock import ControlsDock
 from .trend_view import TrendView
 from .mep_view import MepView
 from .ssep_view import SsepView
-from PyQt5.QtCore import Qt, pyqtSignal
-
-
-class ChannelListWidget(QListWidget):
-    """List widget that emits a signal after internal drag-drop."""
-
-    dropped = pyqtSignal()
-
-    def dropEvent(self, event):
-        super().dropEvent(event)
-        self.dropped.emit()
-
 
 class MainWindow(QMainWindow):
     """Main application window."""
@@ -38,6 +22,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        apply_dark_theme(QApplication.instance())
         self.setWindowTitle("Competitive Viewer")
         self.mep_df = None
         self.ssep_upper_df = None
@@ -63,64 +48,37 @@ class MainWindow(QMainWindow):
         # Dock widget on the left for controls
         dock = QDockWidget("Controls", self)
         dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        dock.setFeatures(QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetMovable)
+        dock.setMinimumWidth(280)
+        dock.setMaximumWidth(280)
         self.addDockWidget(Qt.LeftDockWidgetArea, dock)
 
-        dock_container = QWidget()
-        dock_layout = QVBoxLayout(dock_container)
+        self.controls = ControlsDock()
+        dock.setWidget(self.controls)
 
-        # Surgery selection
-        self.surgery_combo = QComboBox()
+        # Expose widgets for convenience
+        self.surgery_combo = self.controls.surgery_combo
+        self.date_label = self.controls.date_label
+        self.protocol_label = self.controls.protocol_label
+        self.timestamp_slider = self.controls.timestamp_slider
+        self.start_spin = self.controls.start_spin
+        self.end_spin = self.controls.end_spin
+        self.channel_list = self.controls.channel_list
+
         self.surgery_combo.currentTextChanged.connect(self.on_surgery_changed)
-        dock_layout.addWidget(self.surgery_combo)
-
-        # Metadata label (date and protocol)
-        self.metadata_label = QLabel("Date: N/A | Protocol: N/A")
-        dock_layout.addWidget(self.metadata_label)
-
-        # Timestamp slider
-        self.timestamp_slider = QSlider(Qt.Horizontal)
-        self.timestamp_slider.setMinimum(0)
-        self.timestamp_slider.setMaximum(100)
         self.timestamp_slider.valueChanged.connect(self.on_timestamp_changed)
-        dock_layout.addWidget(self.timestamp_slider)
-
-        # Time interval selection
-        self.start_spin = QSpinBox()
-        self.end_spin = QSpinBox()
         self.start_spin.valueChanged.connect(self.on_interval_changed)
         self.end_spin.valueChanged.connect(self.on_interval_changed)
-        dock_layout.addWidget(QLabel("Start"))
-        dock_layout.addWidget(self.start_spin)
-        dock_layout.addWidget(QLabel("End"))
-        dock_layout.addWidget(self.end_spin)
-
-        # Channel selection list
-        self.channel_list = ChannelListWidget()
-        self.channel_list.setDragDropMode(QAbstractItemView.InternalMove)
-        self.channel_list.itemChanged.connect(self.on_channels_changed)
-        self.channel_list.dropped.connect(self._emit_channel_order)
-        dock_layout.addWidget(self.channel_list)
-
+        self.controls.channelsReordered.connect(self._emit_channel_order)
         self.channelsReordered.connect(self.trend_tab.set_channel_order)
-
-        dock.setWidget(dock_container)
 
     def populate_surgeries(self, surgery_ids):
         self.surgery_combo.clear()
         self.surgery_combo.addItems([str(s) for s in surgery_ids])
 
     def populate_channels(self, channels, auto_check=True):
-        self.channel_list.clear()
-        for ch in channels:
-            item = QListWidgetItem(str(ch))
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            if auto_check:
-                item.setCheckState(Qt.Checked)
-            else:
-                item.setCheckState(Qt.Unchecked)
-            self.channel_list.addItem(item)
-        # Emit initial order
-        self._emit_channel_order()
+        """Delegate channel population to the controls widget."""
+        self.controls.populate_channels(channels, auto_check)
 
     # -----------------------------------------------------
     # Data loading
@@ -164,9 +122,6 @@ class MainWindow(QMainWindow):
         self.timestamp_slider.setMaximum(self._end_idx)
         if not (self._start_idx <= self.timestamp_slider.value() <= self._end_idx):
             self.timestamp_slider.setValue(self._start_idx)
-        self.update_plots()
-
-    def on_channels_changed(self, item):
         self.update_plots()
 
     def _emit_channel_order(self):
@@ -255,7 +210,8 @@ class MainWindow(QMainWindow):
 
     def _update_surgery_meta_label(self):
         if self.surgery_meta_df is None or self.surgery_meta_df.empty:
-            self.metadata_label.setText("Date: N/A | Protocol: N/A")
+            self.date_label.setText("N/A")
+            self.protocol_label.setText("N/A")
             return
         sid = self.surgery_combo.currentText()
         if sid in self.surgery_meta_df.index:
@@ -266,11 +222,13 @@ class MainWindow(QMainWindow):
         else:
             row = None
         if row is None:
-            self.metadata_label.setText("Date: N/A | Protocol: N/A")
+            self.date_label.setText("N/A")
+            self.protocol_label.setText("N/A")
         else:
             date = row.get("date", "N/A")
             protocol = row.get("protocol", "N/A")
-            self.metadata_label.setText(f"Date: {date} | Protocol: {protocol}")
+            self.date_label.setText(str(date))
+            self.protocol_label.setText(str(protocol))
 
 
 if __name__ == "__main__":

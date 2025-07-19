@@ -1,0 +1,10 @@
+/* Dark theme skeleton */
+QWidget { background: #282C34; color: #ABB2BF; }
+QToolTip { color:#282C34; background:#E5C07B; border:0; }
+QTabBar::tab { background:#3E4451; padding:6px 12px; border-radius:4px; }
+QTabBar::tab:selected { background:#61AFEF; color:#FFFFFF; }
+QDockWidget::title { background:#3E4451; text-align:center; }
+QSlider::groove:horizontal { height:4px; background:#3E4451; }
+QSlider::handle:horizontal { width:14px; background:#E06C75; margin:-5px 0; border-radius:7px; }
+QPushButton { background:#3E4451; border:1px solid #ABB2BF; padding:4px 10px; }
+QPushButton:hover { background:#E06C75; }
