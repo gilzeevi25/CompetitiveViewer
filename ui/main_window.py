@@ -14,7 +14,7 @@ from PyQt5.QtWidgets import QListWidgetItem
 from .trend_view import TrendView
 from .mep_view import MepView
 from .ssep_view import SsepView
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 import style
 
 
@@ -31,6 +31,9 @@ class MainWindow(QMainWindow):
         self.ssep_lower_df = None
         self.surgery_meta_df = None
         self._timestamps = []
+        self.play_timer = QTimer(self)
+        self.play_timer.timeout.connect(self._advance_playback)
+        self._play_interval_ms = 1000
         self._setup_ui()
 
     def _setup_ui(self):
@@ -60,6 +63,9 @@ class MainWindow(QMainWindow):
         self.timestamp_label = self.controls.timestamp_label
         self.controls.goto_button.clicked.connect(self._goto_timestamp)
         self.controls.goto_edit.returnPressed.connect(self._goto_timestamp)
+
+        self.controls.play_button.clicked.connect(self.start_playback)
+        self.controls.pause_button.clicked.connect(self.pause_playback)
 
         self.channel_list = self.controls.channel_list
         self.channel_list.itemChanged.connect(self.on_channels_changed)
@@ -165,6 +171,7 @@ class MainWindow(QMainWindow):
         self.populate_channels(channels)
 
     def _update_timestamp_slider(self):
+        self.play_timer.stop()
         df = self._current_dataframe()
         if df is None or df.empty:
             self._timestamps = []
@@ -249,6 +256,34 @@ class MainWindow(QMainWindow):
             self.timestamp_slider.setValue(idx)
             self._update_timestamp_label(idx)
             self.update_plots()
+
+    # -----------------------------------------------------
+    # Playback helpers
+    # -----------------------------------------------------
+    def start_playback(self):
+        """Begin automatic stepping through timestamps."""
+        if not self._timestamps:
+            return
+        speed_text = self.controls.speed_combo.currentText().lstrip("x")
+        try:
+            speed = float(speed_text)
+        except ValueError:
+            speed = 1.0
+        interval = int(self._play_interval_ms / speed)
+        if interval <= 0:
+            interval = 1
+        self.play_timer.start(interval)
+
+    def pause_playback(self):
+        """Pause the playback timer."""
+        self.play_timer.stop()
+
+    def _advance_playback(self):
+        idx = self.timestamp_slider.value() + 1
+        if idx > self.timestamp_slider.maximum():
+            self.play_timer.stop()
+            return
+        self.timestamp_slider.setValue(idx)
 
 
 if __name__ == "__main__":

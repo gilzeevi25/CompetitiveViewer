@@ -72,6 +72,26 @@ class ControlsDock(QDockWidget):
         goto_layout.addWidget(self.goto_button)
         layout.addLayout(goto_layout)
 
+        # Playback controls
+        play_layout = QHBoxLayout()
+        self.play_button = QPushButton("Play")
+        self.pause_button = QPushButton("Pause")
+        self.speed_combo = QComboBox()
+        self.speed_combo.addItems([
+            "x0.5",
+            "x0.75",
+            "x1",
+            "x1.5",
+            "x1.75",
+            "x2",
+            "x5",
+        ])
+        self.speed_combo.setCurrentText("x1")
+        play_layout.addWidget(self.play_button)
+        play_layout.addWidget(self.pause_button)
+        play_layout.addWidget(self.speed_combo)
+        layout.addLayout(play_layout)
+
         # Export buttons
         export_layout = QHBoxLayout()
         self.export_png_btn = QPushButton("Export PNG")
