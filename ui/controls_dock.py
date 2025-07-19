@@ -1,0 +1,79 @@
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtWidgets import (
+    QDockWidget,
+    QWidget,
+    QVBoxLayout,
+    QFormLayout,
+    QLabel,
+    QComboBox,
+    QListWidget,
+    QListWidgetItem,
+    QAbstractItemView,
+    QSlider,
+    QSpinBox,
+    QPushButton,
+    QHBoxLayout,
+)
+
+
+class ChannelListWidget(QListWidget):
+    """List widget that emits a signal after internal drag-drop."""
+
+    dropped = pyqtSignal()
+
+    def dropEvent(self, event):
+        super().dropEvent(event)
+        self.dropped.emit()
+
+
+class ControlsDock(QDockWidget):
+    """Dock widget containing all interaction controls."""
+
+    def __init__(self, parent=None):
+        super().__init__("Controls", parent)
+        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setFeatures(QDockWidget.DockWidgetClosable)
+        self.setFixedWidth(280)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(4, 4, 4, 4)
+
+        # Surgery selector
+        self.surgery_combo = QComboBox()
+        layout.addWidget(self.surgery_combo)
+
+        # Metadata form
+        form = QFormLayout()
+        self.date_label = QLabel("N/A")
+        self.protocol_label = QLabel("N/A")
+        form.addRow("Date", self.date_label)
+        form.addRow("Protocol", self.protocol_label)
+        layout.addLayout(form)
+
+        # Channel list
+        self.channel_list = ChannelListWidget()
+        self.channel_list.setDragDropMode(QAbstractItemView.InternalMove)
+        layout.addWidget(self.channel_list)
+
+        # Timestamp slider
+        self.timestamp_slider = QSlider(Qt.Horizontal)
+        layout.addWidget(self.timestamp_slider)
+
+        # Interval picker
+        interval_form = QFormLayout()
+        self.start_spin = QSpinBox()
+        self.end_spin = QSpinBox()
+        interval_form.addRow("Start", self.start_spin)
+        interval_form.addRow("End", self.end_spin)
+        layout.addLayout(interval_form)
+
+        # Export buttons
+        export_layout = QHBoxLayout()
+        self.export_png_btn = QPushButton("Export PNG")
+        self.export_csv_btn = QPushButton("Export CSV")
+        export_layout.addWidget(self.export_png_btn)
+        export_layout.addWidget(self.export_csv_btn)
+        layout.addLayout(export_layout)
+
+        self.setWidget(container)
