@@ -1,4 +1,7 @@
 import pyqtgraph as pg
+from PyQt5.QtWidgets import QToolTip
+from PyQt5.QtGui import QCursor
+from .plot_widgets import MEP_PEN, BASELINE_PEN, CustomPlotMenu
 
 
 class MepView(pg.PlotWidget):
@@ -7,6 +10,13 @@ class MepView(pg.PlotWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.showGrid(x=True, y=True, alpha=0.3)
+        self.addLegend(offset=(30, 10))
+        self.scene().contextMenu = CustomPlotMenu(self)
+        self.scene().sigMouseMoved.connect(self._on_hover)
+
+    def _on_hover(self, pos):
+        point = self.plotItem.vb.mapSceneToView(pos)
+        QToolTip.showText(QCursor.pos(), f"t={point.x():.2f}s\nµV={point.y():.2f}")
 
     def update_view(self, mep_df, surgery_id, timestamp, channels_ordered):
         """Update the plot with MEP and baseline signals.
@@ -59,13 +69,17 @@ class MepView(pg.PlotWidget):
             self.plot(
                 x_values,
                 [v + y_offset for v in values],
-                pen=pg.mkPen("r"),
+                pen=MEP_PEN,
+                name=str(channel),
             )
-            self.plot(x_baseline,
-                      [v + y_offset for v in baseline],
-                      pen=pg.mkPen("w"))
+            self.plot(
+                x_baseline,
+                [v + y_offset for v in baseline],
+                pen=BASELINE_PEN,
+            )
 
             text = pg.TextItem(f"{channel} ({row['signal_rate']}Hz)")
             text.setPos(x_values[-1] if x_values else 0, y_offset)
             self.addItem(text)
+
 

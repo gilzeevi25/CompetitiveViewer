@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QLabel,
+    QSplitter,
 )
 import pyqtgraph as pg
 
@@ -38,6 +39,12 @@ class TrendView(QWidget):
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
 
+        self.splitter = QSplitter(Qt.Vertical)
+        layout.addWidget(self.splitter)
+
+        top_widget = QWidget()
+        top_layout = QVBoxLayout(top_widget)
+
         # Radio buttons to select data source
         radio_layout = QHBoxLayout()
         self.mep_radio = QRadioButton("MEP")
@@ -50,23 +57,25 @@ class TrendView(QWidget):
         self.ssep_radio.toggled.connect(self.update_view)
         radio_layout.addWidget(self.mep_radio)
         radio_layout.addWidget(self.ssep_radio)
-        layout.addLayout(radio_layout)
+        top_layout.addLayout(radio_layout)
 
         # Plot widget
         self.plot = pg.PlotWidget()
         self.plot.showGrid(x=True, y=True, alpha=0.3)
         self._legend = self.plot.addLegend()
-        layout.addWidget(self.plot)
+        top_layout.addWidget(self.plot)
+        self.splitter.addWidget(top_widget)
 
-        # Stats labels
-        stats_layout = QHBoxLayout()
+        # Stats panel
+        stats_widget = QWidget()
+        stats_layout = QHBoxLayout(stats_widget)
         self.min_label = QLabel("Min: N/A")
         self.max_label = QLabel("Max: N/A")
         self.mean_label = QLabel("Mean: N/A")
         stats_layout.addWidget(self.min_label)
         stats_layout.addWidget(self.max_label)
         stats_layout.addWidget(self.mean_label)
-        layout.addLayout(stats_layout)
+        self.splitter.addWidget(stats_widget)
 
     def refresh(self, data_dict: dict) -> None:
         """Update internal data and refresh the display."""
