@@ -46,9 +46,11 @@ class SsepView(BasePlotWidget):
 
         ssep_df = pd.concat(frames, ignore_index=True)
 
-        subset = ssep_df[(ssep_df["surgery_id"] == surgery_id) &
-                         (ssep_df["timestamp"] == timestamp) &
-                         (ssep_df["channel"].isin(channels_ordered))]
+        subset = ssep_df[
+            (ssep_df["surgery_id"] == surgery_id)
+            & (ssep_df["timestamp"] == timestamp)
+            & (ssep_df["channel"].isin(channels_ordered))
+        ]
         if subset.empty:
             return
 
@@ -64,7 +66,11 @@ class SsepView(BasePlotWidget):
 
         legend_added = set()
 
-        for idx, channel in enumerate(channels_ordered):
+        upper = [ch for ch in channels_ordered if (subset[(subset["channel"] == ch) & (subset["region"] == "Upper")].any().any())]
+        lower = [ch for ch in channels_ordered if (subset[(subset["channel"] == ch) & (subset["region"] == "Lower")].any().any())]
+        ordered = upper + lower
+
+        for idx, channel in enumerate(ordered):
             row = subset[subset["channel"] == channel]
             if row.empty:
                 continue
@@ -73,8 +79,8 @@ class SsepView(BasePlotWidget):
             baseline = row["baseline_values"]
             region = row.get("region", "")
 
-            x_values = [i / row["signal_rate"] for i in range(len(values))]
-            x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
+            x_values = list(range(len(values)))
+            x_baseline = list(range(len(baseline)))
             y_offset = idx * offset_step
 
             pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN

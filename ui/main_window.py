@@ -75,9 +75,26 @@ class MainWindow(QMainWindow):
         self.surgery_combo.addItems([str(s) for s in surgery_ids])
 
     def populate_channels(self, channels, auto_check=True):
+        """Populate the channel list widget.
+
+        Parameters
+        ----------
+        channels : Iterable
+            Each element can either be a channel name or a tuple of
+            ``(display_text, channel_name)``.  The display text will be
+            shown in the list while ``channel_name`` is used internally
+            for plotting and ordering.
+        auto_check : bool, optional
+            Whether the channels should be checked by default.
+        """
         self.channel_list.clear()
         for ch in channels:
-            item = QListWidgetItem(str(ch))
+            if isinstance(ch, tuple):
+                display, value = ch
+            else:
+                display = value = ch
+            item = QListWidgetItem(str(display))
+            item.setData(Qt.UserRole, value)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             if auto_check:
                 item.setCheckState(Qt.Checked)
@@ -127,7 +144,10 @@ class MainWindow(QMainWindow):
         self.update_plots()
 
     def _emit_channel_order(self):
-        order = [self.channel_list.item(i).text() for i in range(self.channel_list.count())]
+        order = [
+            self.channel_list.item(i).data(Qt.UserRole)
+            for i in range(self.channel_list.count())
+        ]
         self.channelsReordered.emit(order)
         self.update_plots()
 
@@ -155,13 +175,17 @@ class MainWindow(QMainWindow):
         if self.tabs.currentIndex() == 0:
             df = self.mep_df
             channels = sorted(df["channel"].unique()) if df is not None else []
-        else:
-            channels = set()
-            if self.ssep_upper_df is not None:
-                channels.update(self.ssep_upper_df["channel"].unique())
-            if self.ssep_lower_df is not None:
-                channels.update(self.ssep_lower_df["channel"].unique())
-            channels = sorted(channels)
+            self.populate_channels(channels)
+            return
+
+        channels = []
+        if self.ssep_upper_df is not None:
+            for ch in sorted(self.ssep_upper_df["channel"].unique()):
+                channels.append((f"Upper: {ch}", ch))
+        if self.ssep_lower_df is not None:
+            for ch in sorted(self.ssep_lower_df["channel"].unique()):
+                channels.append((f"Lower: {ch}", ch))
+
         self.populate_channels(channels)
 
     def _update_timestamp_slider(self):
@@ -183,9 +207,11 @@ class MainWindow(QMainWindow):
             self.timestamp_slider.setMaximum(0)
 
     def update_plots(self):
-        channels = [self.channel_list.item(i).text()
-                    for i in range(self.channel_list.count())
-                    if self.channel_list.item(i).checkState() == Qt.Checked]
+        channels = [
+            self.channel_list.item(i).data(Qt.UserRole)
+            for i in range(self.channel_list.count())
+            if self.channel_list.item(i).checkState() == Qt.Checked
+        ]
         timestamp = None
         idx = self.timestamp_slider.value()
         if 0 <= idx < len(self._timestamps):
