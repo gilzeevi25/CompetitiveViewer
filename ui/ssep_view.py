@@ -64,17 +64,26 @@ class SsepView(BasePlotWidget):
 
         legend_added = set()
 
-        for idx, channel in enumerate(channels_ordered):
+        # ensure upper channels are plotted above lower channels
+        channel_rows = []
+        for channel in channels_ordered:
             row = subset[subset["channel"] == channel]
             if row.empty:
                 continue
             row = row.iloc[0]
-            values = row["values"]
-            baseline = row["baseline_values"]
             region = row.get("region", "")
+            channel_rows.append((region, channel, row))
+
+        ordered_rows = [r for r in channel_rows if r[0] == "Upper"] + [r for r in channel_rows if r[0] != "Upper"]
+
+        for idx, (region, channel, row) in enumerate(ordered_rows):
+            values = row["values"]
+            baseline = row.get("baseline_values", [])
 
             x_values = [i / row["signal_rate"] for i in range(len(values))]
-            x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
+            x_baseline = [
+                i / row["baseline_signal_rate"] for i in range(len(baseline))
+            ]
             y_offset = idx * offset_step
 
             pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
@@ -86,13 +95,15 @@ class SsepView(BasePlotWidget):
                 pen=pen,
                 name=name,
             )
-            self.plot(
-                x_baseline,
-                [v + y_offset for v in baseline],
-                pen=BASELINE_PEN,
-            )
+            if len(baseline) > 0:
+                self.plot(
+                    x_baseline,
+                    [v + y_offset for v in baseline],
+                    pen=BASELINE_PEN,
+                )
 
-            text = pg.TextItem(f"{channel} ({row['signal_rate']}Hz)")
+            prefix = f"{region}: " if region else ""
+            text = pg.TextItem(f"{prefix}{channel} ({row['signal_rate']}Hz)")
             text.setPos(x_values[-1] if x_values else 0, y_offset)
             self.addItem(text)
 
