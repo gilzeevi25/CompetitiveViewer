@@ -5,15 +5,11 @@ from PyQt5.QtWidgets import (
     QTabWidget,
     QWidget,
     QVBoxLayout,
-    QDockWidget,
-    QComboBox,
-    QSlider,
-    QSpinBox,
-    QLabel,
-    QListWidget,
     QListWidgetItem,
-    QAbstractItemView,
 )
+from PyQt5.QtWidgets import QApplication
+import style
+from .controls_dock import ControlsDock
 
 from .trend_view import TrendView
 from .mep_view import MepView
@@ -21,14 +17,6 @@ from .ssep_view import SsepView
 from PyQt5.QtCore import Qt, pyqtSignal
 
 
-class ChannelListWidget(QListWidget):
-    """List widget that emits a signal after internal drag-drop."""
-
-    dropped = pyqtSignal()
-
-    def dropEvent(self, event):
-        super().dropEvent(event)
-        self.dropped.emit()
 
 
 class MainWindow(QMainWindow):
@@ -46,6 +34,7 @@ class MainWindow(QMainWindow):
         self._start_idx = 0
         self._end_idx = 0
         self._timestamps = []
+        style.apply_dark_theme(QApplication.instance())
         self._setup_ui()
 
     def _setup_ui(self):
@@ -60,57 +49,24 @@ class MainWindow(QMainWindow):
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.setCentralWidget(self.tabs)
 
-        # Dock widget on the left for controls
-        dock = QDockWidget("Controls", self)
-        dock.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
-        self.addDockWidget(Qt.LeftDockWidgetArea, dock)
-
-        dock_container = QWidget()
-        dock_layout = QVBoxLayout(dock_container)
-
-        # Surgery selection
-        self.surgery_combo = QComboBox()
-        self.surgery_combo.currentTextChanged.connect(self.on_surgery_changed)
-        dock_layout.addWidget(self.surgery_combo)
-
-        # Metadata label (date and protocol)
-        self.metadata_label = QLabel("Date: N/A | Protocol: N/A")
-        dock_layout.addWidget(self.metadata_label)
-
-        # Timestamp slider
-        self.timestamp_slider = QSlider(Qt.Horizontal)
-        self.timestamp_slider.setMinimum(0)
-        self.timestamp_slider.setMaximum(100)
-        self.timestamp_slider.valueChanged.connect(self.on_timestamp_changed)
-        dock_layout.addWidget(self.timestamp_slider)
-
-        # Time interval selection
-        self.start_spin = QSpinBox()
-        self.end_spin = QSpinBox()
-        self.start_spin.valueChanged.connect(self.on_interval_changed)
-        self.end_spin.valueChanged.connect(self.on_interval_changed)
-        dock_layout.addWidget(QLabel("Start"))
-        dock_layout.addWidget(self.start_spin)
-        dock_layout.addWidget(QLabel("End"))
-        dock_layout.addWidget(self.end_spin)
-
-        # Channel selection list
-        self.channel_list = ChannelListWidget()
-        self.channel_list.setDragDropMode(QAbstractItemView.InternalMove)
-        self.channel_list.itemChanged.connect(self.on_channels_changed)
-        self.channel_list.dropped.connect(self._emit_channel_order)
-        dock_layout.addWidget(self.channel_list)
+        # Controls dock
+        self.controls = ControlsDock(self)
+        self.controls.surgery_combo.currentTextChanged.connect(self.on_surgery_changed)
+        self.controls.timestamp_slider.valueChanged.connect(self.on_timestamp_changed)
+        self.controls.start_spin.valueChanged.connect(self.on_interval_changed)
+        self.controls.end_spin.valueChanged.connect(self.on_interval_changed)
+        self.controls.channel_list.itemChanged.connect(self.on_channels_changed)
+        self.controls.channel_list.dropped.connect(self._emit_channel_order)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.controls)
 
         self.channelsReordered.connect(self.trend_tab.set_channel_order)
 
-        dock.setWidget(dock_container)
-
     def populate_surgeries(self, surgery_ids):
-        self.surgery_combo.clear()
-        self.surgery_combo.addItems([str(s) for s in surgery_ids])
+        self.controls.surgery_combo.clear()
+        self.controls.surgery_combo.addItems([str(s) for s in surgery_ids])
 
     def populate_channels(self, channels, auto_check=True):
-        self.channel_list.clear()
+        self.controls.channel_list.clear()
         for ch in channels:
             item = QListWidgetItem(str(ch))
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
@@ -118,7 +74,7 @@ class MainWindow(QMainWindow):
                 item.setCheckState(Qt.Checked)
             else:
                 item.setCheckState(Qt.Unchecked)
-            self.channel_list.addItem(item)
+            self.controls.channel_list.addItem(item)
         # Emit initial order
         self._emit_channel_order()
 
@@ -158,19 +114,19 @@ class MainWindow(QMainWindow):
         self.update_plots()
 
     def on_interval_changed(self, value):
-        self._start_idx = min(self.start_spin.value(), self.end_spin.value())
-        self._end_idx = max(self.start_spin.value(), self.end_spin.value())
-        self.timestamp_slider.setMinimum(self._start_idx)
-        self.timestamp_slider.setMaximum(self._end_idx)
-        if not (self._start_idx <= self.timestamp_slider.value() <= self._end_idx):
-            self.timestamp_slider.setValue(self._start_idx)
+        self._start_idx = min(self.controls.start_spin.value(), self.controls.end_spin.value())
+        self._end_idx = max(self.controls.start_spin.value(), self.controls.end_spin.value())
+        self.controls.timestamp_slider.setMinimum(self._start_idx)
+        self.controls.timestamp_slider.setMaximum(self._end_idx)
+        if not (self._start_idx <= self.controls.timestamp_slider.value() <= self._end_idx):
+            self.controls.timestamp_slider.setValue(self._start_idx)
         self.update_plots()
 
     def on_channels_changed(self, item):
         self.update_plots()
 
     def _emit_channel_order(self):
-        order = [self.channel_list.item(i).text() for i in range(self.channel_list.count())]
+        order = [self.controls.channel_list.item(i).text() for i in range(self.controls.channel_list.count())]
         self.channelsReordered.emit(order)
         self.update_plots()
 
@@ -211,36 +167,36 @@ class MainWindow(QMainWindow):
         df = self._current_dataframe()
         if df is None or df.empty:
             self._timestamps = []
-            self.timestamp_slider.setMaximum(0)
+            self.controls.timestamp_slider.setMaximum(0)
             return
-        surgery = self.surgery_combo.currentText()
+        surgery = self.controls.surgery_combo.currentText()
         subset = df[df["surgery_id"] == surgery]
         unique_ts = sorted(subset["timestamp"].unique())
         self._timestamps = unique_ts
         if unique_ts:
-            self.timestamp_slider.setMinimum(0)
-            self.timestamp_slider.setMaximum(len(unique_ts) - 1)
-            self.start_spin.setMaximum(len(unique_ts) - 1)
-            self.end_spin.setMaximum(len(unique_ts) - 1)
-            self.start_spin.setValue(0)
-            self.end_spin.setValue(len(unique_ts) - 1)
+            self.controls.timestamp_slider.setMinimum(0)
+            self.controls.timestamp_slider.setMaximum(len(unique_ts) - 1)
+            self.controls.start_spin.setMaximum(len(unique_ts) - 1)
+            self.controls.end_spin.setMaximum(len(unique_ts) - 1)
+            self.controls.start_spin.setValue(0)
+            self.controls.end_spin.setValue(len(unique_ts) - 1)
             self._start_idx = 0
             self._end_idx = len(unique_ts) - 1
-            self.timestamp_slider.setMinimum(self._start_idx)
-            self.timestamp_slider.setMaximum(self._end_idx)
-            self.timestamp_slider.setValue(self._start_idx)
+            self.controls.timestamp_slider.setMinimum(self._start_idx)
+            self.controls.timestamp_slider.setMaximum(self._end_idx)
+            self.controls.timestamp_slider.setValue(self._start_idx)
         else:
-            self.timestamp_slider.setMaximum(0)
+            self.controls.timestamp_slider.setMaximum(0)
 
     def update_plots(self):
-        channels = [self.channel_list.item(i).text()
-                    for i in range(self.channel_list.count())
-                    if self.channel_list.item(i).checkState() == Qt.Checked]
+        channels = [self.controls.channel_list.item(i).text()
+                    for i in range(self.controls.channel_list.count())
+                    if self.controls.channel_list.item(i).checkState() == Qt.Checked]
         timestamp = None
-        idx = self.timestamp_slider.value()
+        idx = self.controls.timestamp_slider.value()
         if 0 <= idx < len(self._timestamps):
             timestamp = self._timestamps[idx]
-        surgery = self.surgery_combo.currentText()
+        surgery = self.controls.surgery_combo.currentText()
 
         if self.tabs.currentIndex() == 0:
             self.mep_view.update_view(self.mep_df, surgery, timestamp, channels)
@@ -255,9 +211,10 @@ class MainWindow(QMainWindow):
 
     def _update_surgery_meta_label(self):
         if self.surgery_meta_df is None or self.surgery_meta_df.empty:
-            self.metadata_label.setText("Date: N/A | Protocol: N/A")
+            self.controls.date_label.setText("N/A")
+            self.controls.protocol_label.setText("N/A")
             return
-        sid = self.surgery_combo.currentText()
+        sid = self.controls.surgery_combo.currentText()
         if sid in self.surgery_meta_df.index:
             row = self.surgery_meta_df.loc[sid]
         elif "surgery_id" in self.surgery_meta_df.columns:
@@ -266,11 +223,13 @@ class MainWindow(QMainWindow):
         else:
             row = None
         if row is None:
-            self.metadata_label.setText("Date: N/A | Protocol: N/A")
+            self.controls.date_label.setText("N/A")
+            self.controls.protocol_label.setText("N/A")
         else:
             date = row.get("date", "N/A")
             protocol = row.get("protocol", "N/A")
-            self.metadata_label.setText(f"Date: {date} | Protocol: {protocol}")
+            self.controls.date_label.setText(str(date))
+            self.controls.protocol_label.setText(str(protocol))
 
 
 if __name__ == "__main__":

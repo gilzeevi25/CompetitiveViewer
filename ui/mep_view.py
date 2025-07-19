@@ -1,12 +1,12 @@
 import pyqtgraph as pg
+from .plot_widgets import BasePlotWidget, MEP_PEN, BASELINE_PEN
 
 
-class MepView(pg.PlotWidget):
+class MepView(BasePlotWidget):
     """Widget for displaying MEP signals."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.showGrid(x=True, y=True, alpha=0.3)
 
     def update_view(self, mep_df, surgery_id, timestamp, channels_ordered):
         """Update the plot with MEP and baseline signals.
@@ -59,11 +59,13 @@ class MepView(pg.PlotWidget):
             self.plot(
                 x_values,
                 [v + y_offset for v in values],
-                pen=pg.mkPen("r"),
+                pen=MEP_PEN,
             )
-            self.plot(x_baseline,
-                      [v + y_offset for v in baseline],
-                      pen=pg.mkPen("w"))
+            self.plot(
+                x_baseline,
+                [v + y_offset for v in baseline],
+                pen=BASELINE_PEN,
+            )
 
             text = pg.TextItem(f"{channel} ({row['signal_rate']}Hz)")
             text.setPos(x_values[-1] if x_values else 0, y_offset)

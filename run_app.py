@@ -1,5 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QDialog
+import style
 
 from ui.launch_dialog import LaunchDialog
 from ui.main_window import MainWindow
@@ -7,6 +8,7 @@ from ui.main_window import MainWindow
 
 def main() -> None:
     app = QApplication(sys.argv)
+    style.apply_dark_theme(app)
     dialog = LaunchDialog()
     if dialog.exec_() != QDialog.Accepted:
         sys.exit(0)

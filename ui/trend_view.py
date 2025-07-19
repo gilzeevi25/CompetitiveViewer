@@ -6,8 +6,11 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QLabel,
+    QSplitter,
 )
 import pyqtgraph as pg
+from PyQt5.QtCore import Qt
+from .plot_widgets import BasePlotWidget
 
 
 def calculate_p2p(df: pd.DataFrame) -> pd.DataFrame:
@@ -52,21 +55,22 @@ class TrendView(QWidget):
         radio_layout.addWidget(self.ssep_radio)
         layout.addLayout(radio_layout)
 
-        # Plot widget
-        self.plot = pg.PlotWidget()
-        self.plot.showGrid(x=True, y=True, alpha=0.3)
+        self.splitter = QSplitter(Qt.Vertical)
+        self.plot = BasePlotWidget()
         self._legend = self.plot.addLegend()
-        layout.addWidget(self.plot)
+        self.splitter.addWidget(self.plot)
 
-        # Stats labels
-        stats_layout = QHBoxLayout()
+        stats_widget = QWidget()
+        stats_layout = QHBoxLayout(stats_widget)
         self.min_label = QLabel("Min: N/A")
         self.max_label = QLabel("Max: N/A")
         self.mean_label = QLabel("Mean: N/A")
         stats_layout.addWidget(self.min_label)
         stats_layout.addWidget(self.max_label)
         stats_layout.addWidget(self.mean_label)
-        layout.addLayout(stats_layout)
+        self.splitter.addWidget(stats_widget)
+
+        layout.addWidget(self.splitter)
 
     def refresh(self, data_dict: dict) -> None:
         """Update internal data and refresh the display."""
