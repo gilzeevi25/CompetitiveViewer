@@ -52,24 +52,23 @@ class SsepView(QWidget):
         )
         offset_step = all_max * 1.2
 
-        left_channels = []
-        right_channels = []
-        for ch in channels_ordered:
-            if str(ch).lower().startswith("r"):
-                right_channels.append(ch)
-            else:
-                left_channels.append(ch)
+        # Split rows into left and right groups while preserving channel order
+        left_rows = []
+        right_rows = []
+        for region in ("Lower", "Upper"):
+            for ch in channels_ordered:
+                rows = subset[(subset["channel"] == ch) & (subset["region"] == region)]
+                for _, row in rows.iterrows():
+                    target = right_rows if str(ch).lower().startswith("r") else left_rows
+                    target.append(row)
 
         legend_added_left = set()
         legend_added_right = set()
 
-        def plot_group(channels, plot, legend_added):
-            for idx, channel in enumerate(channels):
-                row = subset[subset["channel"] == channel]
-                if row.empty:
-                    continue
-                row = row.iloc[0]
+        def plot_group(rows, plot, legend_added):
+            for idx, row in enumerate(rows):
                 region = row.get("region", "")
+                channel = row["channel"]
                 values = row["values"]
                 baseline = row["baseline_values"]
 
@@ -91,5 +90,5 @@ class SsepView(QWidget):
                 if name:
                     legend_added.add(region)
 
-        plot_group(left_channels, self.left_plot, legend_added_left)
-        plot_group(right_channels, self.right_plot, legend_added_right)
+        plot_group(left_rows, self.left_plot, legend_added_left)
+        plot_group(right_rows, self.right_plot, legend_added_right)
