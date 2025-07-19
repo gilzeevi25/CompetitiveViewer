@@ -137,7 +137,8 @@ class MainWindow(QMainWindow):
         self.update_plots()
 
     def _emit_channel_order(self):
-        order = [self.channel_list.item(i).text() for i in range(self.channel_list.count())]
+        raw = [self.channel_list.item(i).text() for i in range(self.channel_list.count())]
+        order = [c.split(": ", 1)[-1] for c in raw]
         self.channelsReordered.emit(order)
         self.update_plots()
 
@@ -166,12 +167,13 @@ class MainWindow(QMainWindow):
             df = self.mep_df
             channels = sorted(df["channel"].unique()) if df is not None else []
         else:
-            channels = set()
+            channels = []
             if self.ssep_upper_df is not None:
-                channels.update(self.ssep_upper_df["channel"].unique())
+                upper = sorted(self.ssep_upper_df["channel"].unique())
+                channels.extend([f"Upper: {ch}" for ch in upper])
             if self.ssep_lower_df is not None:
-                channels.update(self.ssep_lower_df["channel"].unique())
-            channels = sorted(channels)
+                lower = sorted(self.ssep_lower_df["channel"].unique())
+                channels.extend([f"Lower: {ch}" for ch in lower])
         self.populate_channels(channels)
 
     def _update_timestamp_slider(self):
@@ -210,7 +212,8 @@ class MainWindow(QMainWindow):
         surgery = self.surgery_combo.currentText()
 
         if self.tabs.currentIndex() == 0:
-            self.mep_view.update_view(self.mep_df, surgery, timestamp, channels)
+            clean = [c.split(": ", 1)[-1] for c in channels]
+            self.mep_view.update_view(self.mep_df, surgery, timestamp, clean)
         else:
             self.ssep_view.update_view(
                 self.ssep_upper_df,

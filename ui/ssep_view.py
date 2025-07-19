@@ -46,9 +46,19 @@ class SsepView(BasePlotWidget):
 
         ssep_df = pd.concat(frames, ignore_index=True)
 
+        parsed = []
+        for label in channels_ordered:
+            if label.startswith("Upper: "):
+                parsed.append((label.split(": ", 1)[1], "Upper"))
+            elif label.startswith("Lower: "):
+                parsed.append((label.split(": ", 1)[1], "Lower"))
+            else:
+                parsed.append((label, None))
+
+        channels_only = [c for c, _ in parsed]
         subset = ssep_df[(ssep_df["surgery_id"] == surgery_id) &
                          (ssep_df["timestamp"] == timestamp) &
-                         (ssep_df["channel"].isin(channels_ordered))]
+                         (ssep_df["channel"].isin(channels_only))]
         if subset.empty:
             return
 
@@ -64,14 +74,16 @@ class SsepView(BasePlotWidget):
 
         legend_added = set()
 
-        for idx, channel in enumerate(channels_ordered):
+        for idx, (channel, expected_region) in enumerate(parsed):
             row = subset[subset["channel"] == channel]
+            if expected_region is not None:
+                row = row[row["region"] == expected_region]
             if row.empty:
                 continue
             row = row.iloc[0]
             values = row["values"]
             baseline = row["baseline_values"]
-            region = row.get("region", "")
+            region = row.get("region", expected_region or "")
 
             x_values = [i / row["signal_rate"] for i in range(len(values))]
             x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
@@ -92,7 +104,8 @@ class SsepView(BasePlotWidget):
                 pen=BASELINE_PEN,
             )
 
-            text = pg.TextItem(f"{channel} ({row['signal_rate']}Hz)")
+            label = f"{region}: {channel}" if region else str(channel)
+            text = pg.TextItem(f"{label} ({row['signal_rate']}Hz)")
             text.setPos(x_values[-1] if x_values else 0, y_offset)
             self.addItem(text)
 
