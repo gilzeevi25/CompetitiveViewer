@@ -138,6 +138,8 @@ class MainWindow(QMainWindow):
 
     def _emit_channel_order(self):
         order = [self.channel_list.item(i).text() for i in range(self.channel_list.count())]
+        if self.tabs.currentIndex() == 1:
+            order = [c.split(": ", 1)[1] if ": " in c else c for c in order]
         self.channelsReordered.emit(order)
         self.update_plots()
 
@@ -166,12 +168,13 @@ class MainWindow(QMainWindow):
             df = self.mep_df
             channels = sorted(df["channel"].unique()) if df is not None else []
         else:
-            channels = set()
+            upper = []
+            lower = []
             if self.ssep_upper_df is not None:
-                channels.update(self.ssep_upper_df["channel"].unique())
+                upper = sorted(self.ssep_upper_df["channel"].unique())
             if self.ssep_lower_df is not None:
-                channels.update(self.ssep_lower_df["channel"].unique())
-            channels = sorted(channels)
+                lower = sorted(self.ssep_lower_df["channel"].unique())
+            channels = [f"Upper: {ch}" for ch in upper] + [f"Lower: {ch}" for ch in lower]
         self.populate_channels(channels)
 
     def _update_timestamp_slider(self):
@@ -200,9 +203,13 @@ class MainWindow(QMainWindow):
             self.timestamp_slider.setMaximum(0)
 
     def update_plots(self):
-        channels = [self.channel_list.item(i).text()
-                    for i in range(self.channel_list.count())
-                    if self.channel_list.item(i).checkState() == Qt.Checked]
+        channels = [
+            self.channel_list.item(i).text()
+            for i in range(self.channel_list.count())
+            if self.channel_list.item(i).checkState() == Qt.Checked
+        ]
+        if self.tabs.currentIndex() == 1:
+            channels = [c.split(": ", 1)[1] if ": " in c else c for c in channels]
         timestamp = None
         idx = self.timestamp_slider.value()
         if 0 <= idx < len(self._timestamps):

@@ -92,7 +92,8 @@ class SsepView(BasePlotWidget):
                 pen=BASELINE_PEN,
             )
 
-            text = pg.TextItem(f"{channel} ({row['signal_rate']}Hz)")
+            label = f"{region}: {channel}" if region else str(channel)
+            text = pg.TextItem(f"{label} ({row['signal_rate']}Hz)")
             text.setPos(x_values[-1] if x_values else 0, y_offset)
             self.addItem(text)
 
