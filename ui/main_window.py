@@ -30,8 +30,6 @@ class MainWindow(QMainWindow):
         self.ssep_upper_df = None
         self.ssep_lower_df = None
         self.surgery_meta_df = None
-        self._start_idx = 0
-        self._end_idx = 0
         self._timestamps = []
         self._setup_ui()
 
@@ -57,11 +55,11 @@ class MainWindow(QMainWindow):
 
         self.timestamp_slider = self.controls.timestamp_slider
         self.timestamp_slider.valueChanged.connect(self.on_timestamp_changed)
+        self.timestamp_slider.sliderMoved.connect(self._update_timestamp_label)
 
-        self.start_spin = self.controls.start_spin
-        self.end_spin = self.controls.end_spin
-        self.start_spin.valueChanged.connect(self.on_interval_changed)
-        self.end_spin.valueChanged.connect(self.on_interval_changed)
+        self.timestamp_label = self.controls.timestamp_label
+        self.controls.goto_button.clicked.connect(self._goto_timestamp)
+        self.controls.goto_edit.returnPressed.connect(self._goto_timestamp)
 
         self.channel_list = self.controls.channel_list
         self.channel_list.itemChanged.connect(self.on_channels_changed)
@@ -124,14 +122,6 @@ class MainWindow(QMainWindow):
     def on_timestamp_changed(self, value):
         self.update_plots()
 
-    def on_interval_changed(self, value):
-        self._start_idx = min(self.start_spin.value(), self.end_spin.value())
-        self._end_idx = max(self.start_spin.value(), self.end_spin.value())
-        self.timestamp_slider.setMinimum(self._start_idx)
-        self.timestamp_slider.setMaximum(self._end_idx)
-        if not (self._start_idx <= self.timestamp_slider.value() <= self._end_idx):
-            self.timestamp_slider.setValue(self._start_idx)
-        self.update_plots()
 
     def on_channels_changed(self, item):
         self.update_plots()
@@ -187,15 +177,8 @@ class MainWindow(QMainWindow):
         if unique_ts:
             self.timestamp_slider.setMinimum(0)
             self.timestamp_slider.setMaximum(len(unique_ts) - 1)
-            self.start_spin.setMaximum(len(unique_ts) - 1)
-            self.end_spin.setMaximum(len(unique_ts) - 1)
-            self.start_spin.setValue(0)
-            self.end_spin.setValue(len(unique_ts) - 1)
-            self._start_idx = 0
-            self._end_idx = len(unique_ts) - 1
-            self.timestamp_slider.setMinimum(self._start_idx)
-            self.timestamp_slider.setMaximum(self._end_idx)
-            self.timestamp_slider.setValue(self._start_idx)
+            self.timestamp_slider.setValue(0)
+            self._update_timestamp_label(0)
         else:
             self.timestamp_slider.setMaximum(0)
 
@@ -207,6 +190,7 @@ class MainWindow(QMainWindow):
         idx = self.timestamp_slider.value()
         if 0 <= idx < len(self._timestamps):
             timestamp = self._timestamps[idx]
+        self._update_timestamp_label(idx)
         surgery = self.surgery_combo.currentText()
 
         if self.tabs.currentIndex() == 0:
@@ -241,6 +225,30 @@ class MainWindow(QMainWindow):
             protocol = row.get("protocol", "N/A")
             self.date_label.setText(str(date))
             self.protocol_label.setText(str(protocol))
+
+    def _update_timestamp_label(self, slider_value):
+        """Update label showing the explicit timestamp."""
+        if 0 <= slider_value < len(self._timestamps):
+            value = self._timestamps[slider_value]
+        else:
+            value = "N/A"
+        self.timestamp_label.setText(str(value))
+
+    def _goto_timestamp(self):
+        """Jump slider to the timestamp entered by the user."""
+        text = self.controls.goto_edit.text()
+        if not text:
+            return
+        try:
+            # attempt numeric comparison first
+            target = float(text)
+        except ValueError:
+            target = text
+        if target in self._timestamps:
+            idx = self._timestamps.index(target)
+            self.timestamp_slider.setValue(idx)
+            self._update_timestamp_label(idx)
+            self.update_plots()
 
 
 if __name__ == "__main__":
