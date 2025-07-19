@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QLabel,
 )
 import pyqtgraph as pg
-from .plot_widgets import BasePlotWidget, MEP_PEN, SSEP_U_PEN, SSEP_L_PEN
+from .plot_widgets import BasePlotWidget
 
 
 def calculate_p2p(df: pd.DataFrame) -> pd.DataFrame:
