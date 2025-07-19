@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (
     QLabel,
 )
 import pyqtgraph as pg
+from .plot_widgets import BasePlotWidget, MEP_PEN, SSEP_U_PEN, SSEP_L_PEN
 
 
 def calculate_p2p(df: pd.DataFrame) -> pd.DataFrame:
@@ -53,9 +54,8 @@ class TrendView(QWidget):
         layout.addLayout(radio_layout)
 
         # Plot widget
-        self.plot = pg.PlotWidget()
-        self.plot.showGrid(x=True, y=True, alpha=0.3)
-        self._legend = self.plot.addLegend()
+        self.plot = BasePlotWidget()
+        self._legend = self.plot.plotItem.legend
         layout.addWidget(self.plot)
 
         # Stats labels

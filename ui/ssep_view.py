@@ -1,13 +1,18 @@
 import pandas as pd
 import pyqtgraph as pg
+from .plot_widgets import (
+    BasePlotWidget,
+    SSEP_U_PEN,
+    SSEP_L_PEN,
+    BASELINE_PEN,
+)
 
 
-class SsepView(pg.PlotWidget):
+class SsepView(BasePlotWidget):
     """Widget for displaying SSEP signals."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.showGrid(x=True, y=True, alpha=0.3)
         self._legend = self.addLegend(offset=(10, 10))
 
     def update_view(self, ssep_upper_df, ssep_lower_df, surgery_id, timestamp, channels_ordered):
@@ -72,18 +77,20 @@ class SsepView(pg.PlotWidget):
             x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
             y_offset = idx * offset_step
 
-            pen_color = "b" if region == "Upper" else "g"
+            pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
             name = region if region not in legend_added else None
 
             self.plot(
                 x_values,
                 [v + y_offset for v in values],
-                pen=pg.mkPen(pen_color),
+                pen=pen,
                 name=name,
             )
-            self.plot(x_baseline,
-                      [v + y_offset for v in baseline],
-                      pen=pg.mkPen("w"))
+            self.plot(
+                x_baseline,
+                [v + y_offset for v in baseline],
+                pen=BASELINE_PEN,
+            )
 
             text = pg.TextItem(f"{channel} ({row['signal_rate']}Hz)")
             text.setPos(x_values[-1] if x_values else 0, y_offset)
