@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
     QListWidgetItem,
     QAbstractItemView,
     QSlider,
-    QSpinBox,
+    QLineEdit,
     QPushButton,
     QHBoxLayout,
 )
@@ -56,17 +56,21 @@ class ControlsDock(QDockWidget):
         self.channel_list.setDragDropMode(QAbstractItemView.InternalMove)
         layout.addWidget(self.channel_list)
 
-        # Timestamp slider
+        # Timestamp slider and readout
         self.timestamp_slider = QSlider(Qt.Horizontal)
+        self.timestamp_slider.setTracking(False)
         layout.addWidget(self.timestamp_slider)
+        self.timestamp_label = QLabel("0")
+        layout.addWidget(self.timestamp_label)
 
-        # Interval picker
-        interval_form = QFormLayout()
-        self.start_spin = QSpinBox()
-        self.end_spin = QSpinBox()
-        interval_form.addRow("Start", self.start_spin)
-        interval_form.addRow("End", self.end_spin)
-        layout.addLayout(interval_form)
+        # Jump-to-timestamp entry
+        goto_layout = QHBoxLayout()
+        self.goto_edit = QLineEdit()
+        self.goto_edit.setPlaceholderText("Jump to timestamp")
+        self.goto_button = QPushButton("Go")
+        goto_layout.addWidget(self.goto_edit)
+        goto_layout.addWidget(self.goto_button)
+        layout.addLayout(goto_layout)
 
         # Export buttons
         export_layout = QHBoxLayout()
