@@ -30,8 +30,6 @@ class MainWindow(QMainWindow):
         self.ssep_upper_df = None
         self.ssep_lower_df = None
         self.surgery_meta_df = None
-        self._start_idx = 0
-        self._end_idx = 0
         self._timestamps = []
         self._setup_ui()
 
@@ -57,11 +55,13 @@ class MainWindow(QMainWindow):
 
         self.timestamp_slider = self.controls.timestamp_slider
         self.timestamp_slider.valueChanged.connect(self.on_timestamp_changed)
+        self.timestamp_slider.sliderReleased.connect(self.update_plots)
 
-        self.start_spin = self.controls.start_spin
-        self.end_spin = self.controls.end_spin
-        self.start_spin.valueChanged.connect(self.on_interval_changed)
-        self.end_spin.valueChanged.connect(self.on_interval_changed)
+        self.timestamp_label = self.controls.timestamp_label
+        self.goto_edit = self.controls.goto_edit
+        self.goto_btn = self.controls.goto_btn
+        self.goto_btn.clicked.connect(self.on_goto_timestamp)
+        self.goto_edit.returnPressed.connect(self.on_goto_timestamp)
 
         self.channel_list = self.controls.channel_list
         self.channel_list.itemChanged.connect(self.on_channels_changed)
@@ -122,16 +122,19 @@ class MainWindow(QMainWindow):
         self.update_plots()
 
     def on_timestamp_changed(self, value):
-        self.update_plots()
+        timestamp = self._timestamps[value] if 0 <= value < len(self._timestamps) else "N/A"
+        self.timestamp_label.setText(f"Timestamp: {timestamp}")
 
-    def on_interval_changed(self, value):
-        self._start_idx = min(self.start_spin.value(), self.end_spin.value())
-        self._end_idx = max(self.start_spin.value(), self.end_spin.value())
-        self.timestamp_slider.setMinimum(self._start_idx)
-        self.timestamp_slider.setMaximum(self._end_idx)
-        if not (self._start_idx <= self.timestamp_slider.value() <= self._end_idx):
-            self.timestamp_slider.setValue(self._start_idx)
-        self.update_plots()
+    def on_goto_timestamp(self):
+        text = self.goto_edit.text().strip()
+        if not text:
+            return
+        try:
+            candidate = float(text)
+        except ValueError:
+            candidate = text
+        if candidate in self._timestamps:
+            self.timestamp_slider.setValue(self._timestamps.index(candidate))
 
     def on_channels_changed(self, item):
         self.update_plots()
@@ -187,17 +190,11 @@ class MainWindow(QMainWindow):
         if unique_ts:
             self.timestamp_slider.setMinimum(0)
             self.timestamp_slider.setMaximum(len(unique_ts) - 1)
-            self.start_spin.setMaximum(len(unique_ts) - 1)
-            self.end_spin.setMaximum(len(unique_ts) - 1)
-            self.start_spin.setValue(0)
-            self.end_spin.setValue(len(unique_ts) - 1)
-            self._start_idx = 0
-            self._end_idx = len(unique_ts) - 1
-            self.timestamp_slider.setMinimum(self._start_idx)
-            self.timestamp_slider.setMaximum(self._end_idx)
-            self.timestamp_slider.setValue(self._start_idx)
+            self.timestamp_slider.setValue(0)
+            self.timestamp_label.setText(f"Timestamp: {unique_ts[0]}")
         else:
             self.timestamp_slider.setMaximum(0)
+            self.timestamp_label.setText("Timestamp: N/A")
 
     def update_plots(self):
         channels = [self.channel_list.item(i).text()
