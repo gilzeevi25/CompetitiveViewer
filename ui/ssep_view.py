@@ -1,40 +1,29 @@
 import pandas as pd
 import pyqtgraph as pg
-from .plot_widgets import (
-    BasePlotWidget,
-    SSEP_U_PEN,
-    SSEP_L_PEN,
-    BASELINE_PEN,
-)
+from PyQt5.QtWidgets import QWidget, QHBoxLayout
+
+from .plot_widgets import BasePlotWidget, SSEP_U_PEN, SSEP_L_PEN, BASELINE_PEN
 
 
-class SsepView(BasePlotWidget):
-    """Widget for displaying SSEP signals."""
+class SsepView(QWidget):
+    """Widget for displaying SSEP signals with left/right separation."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._legend = self.addLegend(offset=(10, 10))
+        layout = QHBoxLayout(self)
+        self.left_plot = BasePlotWidget()
+        self.right_plot = BasePlotWidget()
+        layout.addWidget(self.left_plot)
+        layout.addWidget(self.right_plot)
+        self.left_legend = self.left_plot.addLegend(offset=(10, 10))
+        self.right_legend = self.right_plot.addLegend(offset=(10, 10))
 
     def update_view(self, ssep_upper_df, ssep_lower_df, surgery_id, timestamp, channels_ordered):
-        """Update the plot with SSEP and baseline signals.
-
-        Parameters
-        ----------
-        ssep_upper_df : pandas.DataFrame
-            DataFrame containing upper extremity SSEP data.
-        ssep_lower_df : pandas.DataFrame
-            DataFrame containing lower extremity SSEP data.
-        surgery_id : any
-            Selected surgery id.
-        timestamp : any
-            Timestamp to display.
-        channels_ordered : list
-            Channels in the order they should be stacked.
-        """
-        # Clear previous content and legend entries
-        self.clear()
-        if self._legend is not None:
-            self._legend.clear()
+        """Update the plots with SSEP and baseline signals."""
+        for plt, legend in ((self.left_plot, self.left_legend), (self.right_plot, self.right_legend)):
+            plt.clear()
+            if legend is not None:
+                legend.clear()
 
         frames = []
         if ssep_upper_df is not None and not ssep_upper_df.empty:
@@ -46,61 +35,60 @@ class SsepView(BasePlotWidget):
 
         ssep_df = pd.concat(frames, ignore_index=True)
 
-        subset = ssep_df[(ssep_df["surgery_id"] == surgery_id) &
-                         (ssep_df["timestamp"] == timestamp) &
-                         (ssep_df["channel"].isin(channels_ordered))]
+        subset = ssep_df[
+            (ssep_df["surgery_id"] == surgery_id)
+            & (ssep_df["timestamp"] == timestamp)
+            & (ssep_df["channel"].isin(channels_ordered))
+        ]
         if subset.empty:
             return
 
         def max_abs(seq):
             return max((abs(x) for x in seq), default=0)
 
-        # Determine offset so traces don't overlap
         all_max = max(
             max((max_abs(v) for v in subset["values"]), default=1),
             max((max_abs(b) for b in subset["baseline_values"]), default=1),
         )
         offset_step = all_max * 1.2
 
-        legend_added = set()
-
-        # Plot lower channels first so upper channels appear above them
-        ordered = []
+        # Split rows into left and right groups while preserving channel order
+        left_rows = []
+        right_rows = []
         for region in ("Lower", "Upper"):
             for ch in channels_ordered:
-                row = subset[(subset["channel"] == ch) & (subset["region"] == region)]
-                if not row.empty:
-                    ordered.append((region, ch, row.iloc[0]))
+                rows = subset[(subset["channel"] == ch) & (subset["region"] == region)]
+                for _, row in rows.iterrows():
+                    target = right_rows if str(ch).lower().startswith("r") else left_rows
+                    target.append(row)
 
-        for idx, (region, channel, row) in enumerate(ordered):
-            values = row["values"]
-            baseline = row["baseline_values"]
-            region = row.get("region", "")
+        legend_added_left = set()
+        legend_added_right = set()
 
-            # Use sample indices on the x-axis so different lengths are visible
-            x_values = list(range(len(values)))
-            x_baseline = list(range(len(baseline)))
-            y_offset = idx * offset_step
+        def plot_group(rows, plot, legend_added):
+            for idx, row in enumerate(rows):
+                region = row.get("region", "")
+                channel = row["channel"]
+                values = row["values"]
+                baseline = row["baseline_values"]
 
-            pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
-            name = region if region not in legend_added else None
+                x_values = list(range(len(values)))
+                x_baseline = list(range(len(baseline)))
+                y_offset = idx * offset_step
 
-            self.plot(
-                x_values,
-                [v + y_offset for v in values],
-                pen=pen,
-                name=name,
-            )
-            self.plot(
-                x_baseline,
-                [v + y_offset for v in baseline],
-                pen=BASELINE_PEN,
-            )
+                pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
+                name = region if region not in legend_added else None
 
-            label = f"{region}: {channel}"
-            text = pg.TextItem(f"{label} ({row['signal_rate']}Hz)")
-            text.setPos(x_values[-1] if x_values else 0, y_offset)
-            self.addItem(text)
+                plot.plot(x_values, [v + y_offset for v in values], pen=pen, name=name)
+                plot.plot(x_baseline, [v + y_offset for v in baseline], pen=BASELINE_PEN)
 
-            if name:
-                legend_added.add(region)
+                label = f"{region}: {channel}"
+                text = pg.TextItem(f"{label} ({row['signal_rate']}Hz)")
+                text.setPos(x_values[-1] if x_values else 0, y_offset)
+                plot.addItem(text)
+
+                if name:
+                    legend_added.add(region)
+
+        plot_group(left_rows, self.left_plot, legend_added_left)
+        plot_group(right_rows, self.right_plot, legend_added_right)
