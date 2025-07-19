@@ -64,20 +64,37 @@ class SsepView(BasePlotWidget):
 
         legend_added = set()
 
-        # Plot lower channels first so upper channels appear above them
-        ordered = []
+        def is_left(name: str) -> bool:
+            if not name:
+                return True
+            first = str(name)[0].lower()
+            if first == "r":
+                return False
+            return True
+
+        left_order = []
+        right_order = []
         for region in ("Lower", "Upper"):
             for ch in channels_ordered:
                 row = subset[(subset["channel"] == ch) & (subset["region"] == region)]
                 if not row.empty:
-                    ordered.append((region, ch, row.iloc[0]))
+                    entry = (region, ch, row.iloc[0])
+                    if is_left(ch):
+                        left_order.append(entry)
+                    else:
+                        right_order.append(entry)
 
-        for idx, (region, channel, row) in enumerate(ordered):
+        # compute shift for right group
+        max_len = 0
+        for _, _, row in left_order + right_order:
+            max_len = max(max_len, len(row["values"]))
+        x_shift = max_len * 1.1
+
+        for idx, (region, channel, row) in enumerate(left_order):
             values = row["values"]
             baseline = row["baseline_values"]
             region = row.get("region", "")
 
-            # Use sample indices on the x-axis so different lengths are visible
             x_values = list(range(len(values)))
             x_baseline = list(range(len(baseline)))
             y_offset = idx * offset_step
@@ -85,21 +102,35 @@ class SsepView(BasePlotWidget):
             pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
             name = region if region not in legend_added else None
 
-            self.plot(
-                x_values,
-                [v + y_offset for v in values],
-                pen=pen,
-                name=name,
-            )
-            self.plot(
-                x_baseline,
-                [v + y_offset for v in baseline],
-                pen=BASELINE_PEN,
-            )
+            self.plot(x_values, [v + y_offset for v in values], pen=pen, name=name)
+            self.plot(x_baseline, [v + y_offset for v in baseline], pen=BASELINE_PEN)
 
             label = f"{region}: {channel}"
             text = pg.TextItem(f"{label} ({row['signal_rate']}Hz)")
             text.setPos(x_values[-1] if x_values else 0, y_offset)
+            self.addItem(text)
+
+            if name:
+                legend_added.add(region)
+
+        for idx, (region, channel, row) in enumerate(right_order):
+            values = row["values"]
+            baseline = row["baseline_values"]
+            region = row.get("region", "")
+
+            x_values = [x + x_shift for x in range(len(values))]
+            x_baseline = [x + x_shift for x in range(len(baseline))]
+            y_offset = idx * offset_step
+
+            pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
+            name = region if region not in legend_added else None
+
+            self.plot(x_values, [v + y_offset for v in values], pen=pen, name=name)
+            self.plot(x_baseline, [v + y_offset for v in baseline], pen=BASELINE_PEN)
+
+            label = f"{region}: {channel}"
+            text = pg.TextItem(f"{label} ({row['signal_rate']}Hz)")
+            text.setPos(x_values[-1] if x_values else x_shift, y_offset)
             self.addItem(text)
 
             if name:

@@ -80,4 +80,24 @@ class ControlsDock(QDockWidget):
         export_layout.addWidget(self.export_csv_btn)
         layout.addLayout(export_layout)
 
+        # Playback controls
+        playback_layout = QHBoxLayout()
+        self.play_btn = QPushButton("Play")
+        self.pause_btn = QPushButton("Pause")
+        self.speed_combo = QComboBox()
+        self.speed_combo.addItems([
+            "x0.5",
+            "x0.75",
+            "x1",
+            "x1.5",
+            "x1.75",
+            "x2",
+            "x5",
+        ])
+        self.speed_combo.setCurrentText("x1")
+        playback_layout.addWidget(self.play_btn)
+        playback_layout.addWidget(self.pause_btn)
+        playback_layout.addWidget(self.speed_combo)
+        layout.addLayout(playback_layout)
+
         self.setWidget(container)

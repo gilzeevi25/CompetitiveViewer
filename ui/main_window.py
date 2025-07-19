@@ -15,6 +15,7 @@ from .trend_view import TrendView
 from .mep_view import MepView
 from .ssep_view import SsepView
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import QTimer
 import style
 
 
@@ -31,6 +32,8 @@ class MainWindow(QMainWindow):
         self.ssep_lower_df = None
         self.surgery_meta_df = None
         self._timestamps = []
+        self.play_timer = QTimer(self)
+        self.play_timer.timeout.connect(self._advance_timestamp)
         self._setup_ui()
 
     def _setup_ui(self):
@@ -60,6 +63,10 @@ class MainWindow(QMainWindow):
         self.timestamp_label = self.controls.timestamp_label
         self.controls.goto_button.clicked.connect(self._goto_timestamp)
         self.controls.goto_edit.returnPressed.connect(self._goto_timestamp)
+
+        self.controls.play_btn.clicked.connect(self.start_playback)
+        self.controls.pause_btn.clicked.connect(self.pause_playback)
+        self.controls.speed_combo.currentTextChanged.connect(self._update_timer_interval)
 
         self.channel_list = self.controls.channel_list
         self.channel_list.itemChanged.connect(self.on_channels_changed)
@@ -115,11 +122,15 @@ class MainWindow(QMainWindow):
         self.update_plots()
 
     def on_surgery_changed(self, value):
+        self.pause_playback()
         self._update_timestamp_slider()
         self._update_surgery_meta_label()
         self.update_plots()
 
     def on_timestamp_changed(self, value):
+        if self.play_timer.isActive():
+            # user interaction stops playback
+            self.pause_playback()
         self.update_plots()
 
 
@@ -135,6 +146,7 @@ class MainWindow(QMainWindow):
     # Internal helpers
     # -----------------------------------------------------
     def _on_tab_changed(self, index):
+        self.pause_playback()
         self._update_channels_for_current_tab()
         self._update_timestamp_slider()
         self.update_plots()
@@ -249,6 +261,42 @@ class MainWindow(QMainWindow):
             self.timestamp_slider.setValue(idx)
             self._update_timestamp_label(idx)
             self.update_plots()
+
+    # -----------------------------------------------------
+    # Playback helpers
+    # -----------------------------------------------------
+    def _playback_interval(self) -> int:
+        text = self.controls.speed_combo.currentText().lstrip("x")
+        try:
+            speed = float(text)
+        except ValueError:
+            speed = 1.0
+        base_ms = 1000  # 1 second per step at x1
+        if speed <= 0:
+            speed = 1.0
+        return int(base_ms / speed)
+
+    def _update_timer_interval(self) -> None:
+        if self.play_timer.isActive():
+            self.play_timer.setInterval(self._playback_interval())
+
+    def start_playback(self) -> None:
+        if not self._timestamps:
+            return
+        self.play_timer.start(self._playback_interval())
+
+    def pause_playback(self) -> None:
+        self.play_timer.stop()
+
+    def _advance_timestamp(self) -> None:
+        idx = self.timestamp_slider.value()
+        if idx < len(self._timestamps) - 1:
+            idx += 1
+            self.timestamp_slider.setValue(idx)
+            self._update_timestamp_label(idx)
+            self.update_plots()
+        else:
+            self.play_timer.stop()
 
 
 if __name__ == "__main__":
