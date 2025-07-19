@@ -15,7 +15,7 @@ class SsepView(BasePlotWidget):
         super().__init__(parent)
         self._legend = self.addLegend(offset=(10, 10))
 
-    def update_view(self, ssep_upper_df, ssep_lower_df, surgery_id, timestamp, channels_ordered):
+    def update_view(self, ssep_upper_df, ssep_lower_df, mep_df, surgery_id, timestamp, channels_ordered):
         """Update the plot with SSEP and baseline signals.
 
         Parameters
@@ -39,8 +39,14 @@ class SsepView(BasePlotWidget):
         frames = []
         if ssep_upper_df is not None and not ssep_upper_df.empty:
             frames.append(ssep_upper_df.assign(region="Upper"))
+            upper_channels = set(ssep_upper_df["channel"].unique())
+        else:
+            upper_channels = set()
         if ssep_lower_df is not None and not ssep_lower_df.empty:
             frames.append(ssep_lower_df.assign(region="Lower"))
+            lower_channels = set(ssep_lower_df["channel"].unique())
+        else:
+            lower_channels = set()
         if not frames:
             return
 
@@ -64,17 +70,26 @@ class SsepView(BasePlotWidget):
 
         legend_added = set()
 
-        for idx, channel in enumerate(channels_ordered):
+        ordered = [ch for ch in channels_ordered if ch in upper_channels] + [ch for ch in channels_ordered if ch in lower_channels]
+
+        for idx, channel in enumerate(ordered):
             row = subset[subset["channel"] == channel]
             if row.empty:
                 continue
             row = row.iloc[0]
             values = row["values"]
-            baseline = row["baseline_values"]
+            baseline = row.get("baseline_values")
+            if (baseline is None or len(baseline) == 0) and mep_df is not None:
+                mrow = mep_df[(mep_df["surgery_id"] == surgery_id) & (mep_df["channel"] == channel)]
+                if not mrow.empty:
+                    mrow = mrow.iloc[0]
+                    baseline = mrow.get("baseline_values", [])
+                else:
+                    baseline = []
             region = row.get("region", "")
 
-            x_values = [i / row["signal_rate"] for i in range(len(values))]
-            x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
+            x_values = list(range(len(values)))
+            x_baseline = list(range(len(baseline)))
             y_offset = idx * offset_step
 
             pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
