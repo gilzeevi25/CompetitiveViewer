@@ -64,9 +64,9 @@ class SsepView(BasePlotWidget):
 
         legend_added = set()
 
-        # Ensure upper channels are plotted above lower channels
+        # Plot lower channels first so upper channels appear above them
         ordered = []
-        for region in ("Upper", "Lower"):
+        for region in ("Lower", "Upper"):
             for ch in channels_ordered:
                 row = subset[(subset["channel"] == ch) & (subset["region"] == region)]
                 if not row.empty:
