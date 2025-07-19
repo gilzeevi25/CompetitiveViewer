@@ -64,17 +64,22 @@ class SsepView(BasePlotWidget):
 
         legend_added = set()
 
-        for idx, channel in enumerate(channels_ordered):
-            row = subset[subset["channel"] == channel]
-            if row.empty:
-                continue
-            row = row.iloc[0]
+        # Plot lower channels first so upper channels appear above them
+        ordered = []
+        for region in ("Lower", "Upper"):
+            for ch in channels_ordered:
+                row = subset[(subset["channel"] == ch) & (subset["region"] == region)]
+                if not row.empty:
+                    ordered.append((region, ch, row.iloc[0]))
+
+        for idx, (region, channel, row) in enumerate(ordered):
             values = row["values"]
             baseline = row["baseline_values"]
             region = row.get("region", "")
 
-            x_values = [i / row["signal_rate"] for i in range(len(values))]
-            x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
+            # Use sample indices on the x-axis so different lengths are visible
+            x_values = list(range(len(values)))
+            x_baseline = list(range(len(baseline)))
             y_offset = idx * offset_step
 
             pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
@@ -92,7 +97,8 @@ class SsepView(BasePlotWidget):
                 pen=BASELINE_PEN,
             )
 
-            text = pg.TextItem(f"{channel} ({row['signal_rate']}Hz)")
+            label = f"{region}: {channel}"
+            text = pg.TextItem(f"{label} ({row['signal_rate']}Hz)")
             text.setPos(x_values[-1] if x_values else 0, y_offset)
             self.addItem(text)
 
