@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+import shutil
 
 CMD = [
     "pyinstaller",
@@ -10,6 +11,7 @@ CMD = [
     "--exclude-module",
     "tests",
     "--noconsole",
+    "--noconfirm",
     "--collect-all",
     "pandas",
     "--collect-all",
@@ -18,8 +20,12 @@ CMD = [
 
 
 def main() -> None:
-    subprocess.run(CMD, check=True)
     dist = Path("dist") / "NervioViz"
+    if dist.exists():
+        shutil.rmtree(dist)
+
+    subprocess.run(CMD, check=True)
+
     if not dist.is_dir():
         raise SystemExit("Expected dist/NervioViz not found")
     print(f"Executable created in {dist}")

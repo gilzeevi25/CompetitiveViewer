@@ -11,6 +11,8 @@ dist/NervioViz/NervioViz.exe
 The build script collects all required pandas and numpy binaries to avoid
 ``ImportError: DLL load failed`` errors when launching the packaged
 application.
+Existing ``dist/NervioViz`` contents are removed automatically so repeated
+builds do not require manual cleanup.
 
 ## Development
 
