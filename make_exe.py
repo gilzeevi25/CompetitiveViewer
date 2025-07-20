@@ -7,8 +7,6 @@ CMD = [
     "--onedir",
     "--name",
     "NervioViz",
-    "--add-data",
-    "assets;assets",
     "--exclude-module",
     "tests",
     "--noconsole",
