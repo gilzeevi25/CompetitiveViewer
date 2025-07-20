@@ -10,6 +10,10 @@ CMD = [
     "--exclude-module",
     "tests",
     "--noconsole",
+    "--collect-all",
+    "pandas",
+    "--collect-all",
+    "numpy",
 ]
 
 
