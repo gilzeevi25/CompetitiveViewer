@@ -1,11 +1,14 @@
 import os
+import sys
 from PyQt5.QtWidgets import QApplication
 import pyqtgraph as pg
 
 
 def apply_dark_theme(app: QApplication) -> None:
     """Load dark stylesheet and configure pyqtgraph colors."""
-    qss_path = os.path.join(os.path.dirname(__file__), "resources", "dark.qss")
+    # When bundled with PyInstaller, resources are extracted to ``sys._MEIPASS``.
+    base_dir = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+    qss_path = os.path.join(base_dir, "resources", "dark.qss")
     try:
         with open(qss_path, "r", encoding="utf-8") as f:
             app.setStyleSheet(f.read())
