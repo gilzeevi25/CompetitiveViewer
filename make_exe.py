@@ -16,6 +16,8 @@ CMD = [
     "pandas",
     "--collect-all",
     "numpy",
+    "--runtime-hook",
+    "packaging/runtime_hook.py",
 ]
 
 
