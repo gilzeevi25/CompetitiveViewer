@@ -1,6 +1,7 @@
 import subprocess
 from pathlib import Path
 import shutil
+import os
 
 CMD = [
     "pyinstaller",
@@ -17,6 +18,8 @@ CMD = [
     "--copy-metadata", "pandas",
     "--copy-metadata", "numpy",
     "--runtime-hook", "packaging/runtime_hook.py",  # if needed by your app
+    "--add-data",
+    f"resources{os.pathsep}resources",
 ]
 
 
