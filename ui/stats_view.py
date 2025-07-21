@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from PyQt5.QtWidgets import (
     QWidget,
@@ -10,38 +11,36 @@ from PyQt5.QtWidgets import (
     QGridLayout,
 )
 import pyqtgraph as pg
+
 from .plot_widgets import BasePlotWidget
 
 
-def calculate_p2p(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute peak-to-peak amplitude for each timestamp/channel row."""
+def calculate_stats(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute mean, median and max for each timestamp/channel row."""
     if df is None or df.empty:
-        return pd.DataFrame(columns=["timestamp", "channel", "p2p"])
+        return pd.DataFrame(columns=["timestamp", "channel", "mean", "median", "max"])
 
     result = df[["timestamp", "channel", "values"]].copy()
-    result["p2p"] = result["values"].apply(
-        lambda arr: max(arr) - min(arr) if len(arr) > 0 else 0
-    )
-    return result[["timestamp", "channel", "p2p"]]
+    result["mean"] = result["values"].apply(lambda arr: float(np.mean(arr)) if len(arr) > 0 else 0)
+    result["median"] = result["values"].apply(lambda arr: float(np.median(arr)) if len(arr) > 0 else 0)
+    result["max"] = result["values"].apply(lambda arr: max(arr) if len(arr) > 0 else 0)
+    return result[["timestamp", "channel", "mean", "median", "max"]]
 
 
-class TrendView(QWidget):
-    """Widget for displaying peak-to-peak trends across time."""
+class StatsView(QWidget):
+    """Widget for displaying mean/median/max stats across time."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-
         self.mep_df = None
         self.ssep_upper_df = None
         self.ssep_lower_df = None
         self._channel_order = []
-
         self._setup_ui()
 
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        # Radio buttons to select data source
         radio_layout = QHBoxLayout()
         self.mep_radio = QRadioButton("MEP")
         self.ssep_radio = QRadioButton("SSEP")
@@ -55,7 +54,6 @@ class TrendView(QWidget):
         radio_layout.addWidget(self.ssep_radio)
         layout.addLayout(radio_layout)
 
-        # Scroll area of subplots
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.plot_container = QWidget()
@@ -63,9 +61,6 @@ class TrendView(QWidget):
         self.scroll.setWidget(self.plot_container)
         layout.addWidget(self.scroll)
 
-        self.plots = []
-
-        # Stats labels
         stats_layout = QHBoxLayout()
         self.min_label = QLabel("Min: N/A")
         self.max_label = QLabel("Max: N/A")
@@ -75,21 +70,18 @@ class TrendView(QWidget):
         stats_layout.addWidget(self.mean_label)
         layout.addLayout(stats_layout)
 
+        self.plots = []
+
     def refresh(self, data_dict: dict) -> None:
-        """Update internal data and refresh the display."""
         self.mep_df = data_dict.get("mep_df")
         self.ssep_upper_df = data_dict.get("ssep_upper_df")
         self.ssep_lower_df = data_dict.get("ssep_lower_df")
         self.update_view()
 
     def set_channel_order(self, channels: list) -> None:
-        """Update the channel ordering used for plotting."""
         self._channel_order = list(channels)
         self.update_view()
 
-    # -----------------------------------------------------
-    # Internal helpers
-    # -----------------------------------------------------
     def _current_dataframe(self) -> pd.DataFrame:
         if self.mep_radio.isChecked():
             return self.mep_df
@@ -116,8 +108,6 @@ class TrendView(QWidget):
             self.plots.append(plot)
 
     def update_view(self, channels_filter=None) -> None:
-        if isinstance(channels_filter, bool):
-            channels_filter = None
         df = self._current_dataframe()
         if df is None or df.empty:
             for plt in self.plots:
@@ -127,38 +117,40 @@ class TrendView(QWidget):
             self.mean_label.setText("Mean: N/A")
             return
 
-        p2p_df = calculate_p2p(df)
+        stats_df = calculate_stats(df)
         if channels_filter is not None:
-            p2p_df = p2p_df[p2p_df["channel"].isin(channels_filter)]
+            stats_df = stats_df[stats_df["channel"].isin(channels_filter)]
+        channels = list(stats_df["channel"].unique())
+        if self._channel_order:
+            ordered = [ch for ch in self._channel_order if ch in channels]
+            for ch in channels:
+                if ch not in ordered:
+                    ordered.append(ch)
+            channels = ordered
+        else:
+            channels = sorted(channels)
 
-        global_min = p2p_df["p2p"].min()
-        global_max = p2p_df["p2p"].max()
-        global_mean = p2p_df["p2p"].mean()
+        self._create_plots(channels)
+
+        global_min = stats_df[["mean", "median", "max"]].min().min()
+        global_max = stats_df[["mean", "median", "max"]].max().max()
+        global_mean = stats_df[["mean", "median", "max"]].mean().mean()
         self.min_label.setText(f"Min: {global_min:.2f}")
         self.max_label.setText(f"Max: {global_max:.2f}")
         self.mean_label.setText(f"Mean: {global_mean:.2f}")
 
-        unique_channels = list(p2p_df["channel"].unique())
-        if self._channel_order:
-            channels = [ch for ch in self._channel_order if ch in unique_channels]
-            for ch in unique_channels:
-                if ch not in channels:
-                    channels.append(ch)
-        else:
-            channels = sorted(unique_channels)
-
-        self._create_plots(channels)
-
         for idx, channel in enumerate(channels):
-            subset = p2p_df[p2p_df["channel"] == channel]
+            subset = stats_df[stats_df["channel"] == channel]
             x = subset["timestamp"].to_list()
-            y = subset["p2p"].to_list()
+            means = subset["mean"].to_list()
+            medians = subset["median"].to_list()
+            maxs = subset["max"].to_list()
             plot = self.plots[idx]
             plot.clear()
             legend = plot.plotItem.legend
             if legend is not None:
                 legend.clear()
-            color = pg.intColor(idx, hues=len(channels))
-            plot.plot(x, y, pen=pg.mkPen(color, width=2), name=str(channel))
+            plot.plot(x, means, pen=pg.mkPen("y", width=2), name="Mean")
+            plot.plot(x, medians, pen=pg.mkPen("c", width=2), name="Median")
+            plot.plot(x, maxs, pen=pg.mkPen("m", width=2), name="Max")
             plot.setTitle(str(channel))
-

@@ -10,6 +10,7 @@ from .controls_dock import ControlsDock
 from PyQt5.QtWidgets import QListWidgetItem
 
 from .trend_view import TrendView
+from .stats_view import StatsView
 from .mep_view import MepView
 from .ssep_view import SsepView
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
@@ -43,7 +44,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.mep_view, "MEP")
         self.tabs.addTab(self.ssep_view, "SSEP")
         self.trend_tab = TrendView()
+        self.stats_tab = StatsView()
         self.tabs.addTab(self.trend_tab, "Trend Analysis")
+        self.tabs.addTab(self.stats_tab, "Signal Stats")
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.setCentralWidget(self.tabs)
 
@@ -70,6 +73,7 @@ class MainWindow(QMainWindow):
         self.channel_list.dropped.connect(self._emit_channel_order)
 
         self.channelsReordered.connect(self.trend_tab.set_channel_order)
+        self.channelsReordered.connect(self.stats_tab.set_channel_order)
 
         self.date_label = self.controls.date_label
         self.protocol_label = self.controls.protocol_label
@@ -144,27 +148,47 @@ class MainWindow(QMainWindow):
         self.update_plots()
 
     def _current_dataframe(self):
-        if self.tabs.currentIndex() == 0:
+        idx = self.tabs.currentIndex()
+        if idx == 0:
             return self.mep_df
-        frames = []
-        if self.ssep_upper_df is not None:
-            frames.append(self.ssep_upper_df)
-        if self.ssep_lower_df is not None:
-            frames.append(self.ssep_lower_df)
-        if frames:
-            return pd.concat(frames, ignore_index=True)
-        return None
+        elif idx == 1:
+            frames = []
+            if self.ssep_upper_df is not None:
+                frames.append(self.ssep_upper_df)
+            if self.ssep_lower_df is not None:
+                frames.append(self.ssep_lower_df)
+            if frames:
+                return pd.concat(frames, ignore_index=True)
+            return None
+        else:
+            frames = []
+            if self.mep_df is not None:
+                frames.append(self.mep_df)
+            if self.ssep_upper_df is not None:
+                frames.append(self.ssep_upper_df)
+            if self.ssep_lower_df is not None:
+                frames.append(self.ssep_lower_df)
+            if frames:
+                return pd.concat(frames, ignore_index=True)
+            return None
 
     def _update_channels_for_current_tab(self):
-        if self.tabs.currentIndex() == 0:
+        idx = self.tabs.currentIndex()
+        if idx == 0:
             df = self.mep_df
             channels = sorted(df["channel"].unique()) if df is not None else []
-        else:
+        elif idx == 1:
             channels = set()
             if self.ssep_upper_df is not None:
                 channels.update(self.ssep_upper_df["channel"].unique())
             if self.ssep_lower_df is not None:
                 channels.update(self.ssep_lower_df["channel"].unique())
+            channels = sorted(channels)
+        else:
+            channels = set()
+            for df in (self.mep_df, self.ssep_upper_df, self.ssep_lower_df):
+                if df is not None:
+                    channels.update(df["channel"].unique())
             channels = sorted(channels)
         self.populate_channels(channels)
 
@@ -200,7 +224,7 @@ class MainWindow(QMainWindow):
 
         if self.tabs.currentIndex() == 0:
             self.mep_view.update_view(self.mep_df, surgery, timestamp, channels)
-        else:
+        elif self.tabs.currentIndex() == 1:
             self.ssep_view.update_view(
                 self.ssep_upper_df,
                 self.ssep_lower_df,
@@ -208,6 +232,10 @@ class MainWindow(QMainWindow):
                 timestamp,
                 channels,
             )
+        elif self.tabs.currentIndex() == 2:
+            self.trend_tab.update_view(channels)
+        else:
+            self.stats_tab.update_view(channels)
 
     def _update_surgery_meta_label(self):
         if self.surgery_meta_df is None or self.surgery_meta_df.empty:

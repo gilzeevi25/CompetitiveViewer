@@ -19,11 +19,13 @@ def main() -> None:
             dialog.ssep_lower_df,
             dialog.surgery_meta_df,
         )
-        window.trend_tab.refresh({
+        refresh_data = {
             "mep_df": dialog.mep_df,
             "ssep_upper_df": dialog.ssep_upper_df,
             "ssep_lower_df": dialog.ssep_lower_df,
-        })
+        }
+        window.trend_tab.refresh(refresh_data)
+        window.stats_tab.refresh(refresh_data)
     window.show()
     sys.exit(app.exec_())
 
