@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QLabel,
+    QScrollArea,
 )
 import pyqtgraph as pg
 from .plot_widgets import BasePlotWidget
@@ -33,6 +34,7 @@ class TrendView(QWidget):
         self.ssep_upper_df = None
         self.ssep_lower_df = None
         self._channel_order = []
+        self._selected_channels = []
 
         self._setup_ui()
 
@@ -53,10 +55,14 @@ class TrendView(QWidget):
         radio_layout.addWidget(self.ssep_radio)
         layout.addLayout(radio_layout)
 
-        # Plot widget
-        self.plot = BasePlotWidget()
-        self._legend = self.plot.plotItem.legend
-        layout.addWidget(self.plot)
+        # Container for multiple plot widgets
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.plots_container = QWidget()
+        self.plots_layout = QVBoxLayout(self.plots_container)
+        self.scroll.setWidget(self.plots_container)
+        layout.addWidget(self.scroll)
+        self._plots = []
 
         # Stats labels
         stats_layout = QHBoxLayout()
@@ -80,6 +86,11 @@ class TrendView(QWidget):
         self._channel_order = list(channels)
         self.update_view()
 
+    def set_selected_channels(self, channels: list) -> None:
+        """Specify which channels should be visible."""
+        self._selected_channels = list(channels)
+        self.update_view()
+
     # -----------------------------------------------------
     # Internal helpers
     # -----------------------------------------------------
@@ -98,14 +109,20 @@ class TrendView(QWidget):
 
     def update_view(self) -> None:
         df = self._current_dataframe()
-        self.plot.clear()
-        if self._legend is not None:
-            self._legend.clear()
+
+        # Remove existing plot widgets
+        for plt in self._plots:
+            plt.setParent(None)
+        self._plots.clear()
+
         if df is None or df.empty:
             self.min_label.setText("Min: N/A")
             self.max_label.setText("Max: N/A")
             self.mean_label.setText("Mean: N/A")
             return
+
+        if self._selected_channels:
+            df = df[df["channel"].isin(self._selected_channels)]
 
         p2p_df = calculate_p2p(df)
 
@@ -131,5 +148,8 @@ class TrendView(QWidget):
             x = subset["timestamp"].to_list()
             y = subset["p2p"].to_list()
             color = pg.intColor(idx, hues=len(channels))
-            self.plot.plot(x, y, pen=pg.mkPen(color, width=2), name=str(channel))
+            plt = BasePlotWidget()
+            plt.plot(x, y, pen=pg.mkPen(color, width=2), name=str(channel))
+            self.plots_layout.addWidget(plt)
+            self._plots.append(plt)
 

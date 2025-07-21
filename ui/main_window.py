@@ -10,6 +10,7 @@ from .controls_dock import ControlsDock
 from PyQt5.QtWidgets import QListWidgetItem
 
 from .trend_view import TrendView
+from .stats_view import StatsView
 from .mep_view import MepView
 from .ssep_view import SsepView
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
@@ -44,6 +45,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.ssep_view, "SSEP")
         self.trend_tab = TrendView()
         self.tabs.addTab(self.trend_tab, "Trend Analysis")
+        self.stats_tab = StatsView()
+        self.tabs.addTab(self.stats_tab, "Aggregate")
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.setCentralWidget(self.tabs)
 
@@ -118,6 +121,14 @@ class MainWindow(QMainWindow):
         self._update_surgery_meta_label()
         self.update_plots()
 
+        data_dict = {
+            "mep_df": mep_df,
+            "ssep_upper_df": ssep_upper_df,
+            "ssep_lower_df": ssep_lower_df,
+        }
+        self.trend_tab.refresh(data_dict)
+        self.stats_tab.refresh(data_dict)
+
     def on_surgery_changed(self, value):
         self._update_timestamp_slider()
         self._update_surgery_meta_label()
@@ -191,6 +202,8 @@ class MainWindow(QMainWindow):
         channels = [self.channel_list.item(i).text()
                     for i in range(self.channel_list.count())
                     if self.channel_list.item(i).checkState() == Qt.Checked]
+        self.trend_tab.set_selected_channels(channels)
+        self.stats_tab.set_selected_channels(channels)
         timestamp = None
         idx = self.timestamp_slider.value()
         if 0 <= idx < len(self._timestamps):
