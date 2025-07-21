@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QButtonGroup,
     QLabel,
+    QScrollArea,
 )
 import pyqtgraph as pg
 from .plot_widgets import BasePlotWidget
@@ -53,10 +54,14 @@ class TrendView(QWidget):
         radio_layout.addWidget(self.ssep_radio)
         layout.addLayout(radio_layout)
 
-        # Plot widget
-        self.plot = BasePlotWidget()
-        self._legend = self.plot.plotItem.legend
-        layout.addWidget(self.plot)
+        # Container for per-channel plots
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self._plot_container = QWidget()
+        self._plot_layout = QVBoxLayout(self._plot_container)
+        self.scroll.setWidget(self._plot_container)
+        layout.addWidget(self.scroll)
+        self._plots = {}
 
         # Stats labels
         stats_layout = QHBoxLayout()
@@ -98,9 +103,15 @@ class TrendView(QWidget):
 
     def update_view(self) -> None:
         df = self._current_dataframe()
-        self.plot.clear()
-        if self._legend is not None:
-            self._legend.clear()
+
+        # Remove old plots
+        for i in reversed(range(self._plot_layout.count())):
+            item = self._plot_layout.takeAt(i)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+        self._plots.clear()
+
         if df is None or df.empty:
             self.min_label.setText("Min: N/A")
             self.max_label.setText("Max: N/A")
@@ -131,5 +142,9 @@ class TrendView(QWidget):
             x = subset["timestamp"].to_list()
             y = subset["p2p"].to_list()
             color = pg.intColor(idx, hues=len(channels))
-            self.plot.plot(x, y, pen=pg.mkPen(color, width=2), name=str(channel))
+
+            plot = BasePlotWidget()
+            plot.plot(x, y, pen=pg.mkPen(color, width=2), name=str(channel))
+            self._plot_layout.addWidget(plot)
+            self._plots[channel] = plot
 

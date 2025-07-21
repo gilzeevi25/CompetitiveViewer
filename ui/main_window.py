@@ -10,6 +10,7 @@ from .controls_dock import ControlsDock
 from PyQt5.QtWidgets import QListWidgetItem
 
 from .trend_view import TrendView
+from .stats_view import StatsView
 from .mep_view import MepView
 from .ssep_view import SsepView
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
@@ -43,7 +44,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.mep_view, "MEP")
         self.tabs.addTab(self.ssep_view, "SSEP")
         self.trend_tab = TrendView()
+        self.stats_tab = StatsView()
         self.tabs.addTab(self.trend_tab, "Trend Analysis")
+        self.tabs.addTab(self.stats_tab, "Signal Stats")
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.setCentralWidget(self.tabs)
 
