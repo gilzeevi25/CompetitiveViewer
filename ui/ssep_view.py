@@ -15,15 +15,11 @@ class SsepView(QWidget):
         self.right_plot = BasePlotWidget()
         layout.addWidget(self.left_plot)
         layout.addWidget(self.right_plot)
-        self.left_legend = self.left_plot.addLegend(offset=(10, 10))
-        self.right_legend = self.right_plot.addLegend(offset=(10, 10))
 
     def update_view(self, ssep_upper_df, ssep_lower_df, surgery_id, timestamp, channels_ordered):
         """Update the plots with SSEP and baseline signals."""
-        for plt, legend in ((self.left_plot, self.left_legend), (self.right_plot, self.right_legend)):
-            plt.clear()
-            if legend is not None:
-                legend.clear()
+        self.left_plot.clear()
+        self.right_plot.clear()
 
         frames = []
         if ssep_upper_df is not None and not ssep_upper_df.empty:
@@ -72,8 +68,8 @@ class SsepView(QWidget):
                 values = row["values"]
                 baseline = row["baseline_values"]
 
-                x_values = list(range(len(values)))
-                x_baseline = list(range(len(baseline)))
+                x_values = [i / row["signal_rate"] for i in range(len(values))]
+                x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
                 y_offset = idx * offset_step
 
                 pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
