@@ -236,10 +236,15 @@ class MainWindow(QMainWindow):
             self.protocol_label.setText("N/A")
             return
         sid = self.surgery_combo.currentText()
-        if sid in self.surgery_meta_df.index:
-            row = self.surgery_meta_df.loc[sid]
+        try:
+            sid_typed = type(self.surgery_meta_df.index[0])(sid)
+        except (ValueError, IndexError):
+            sid_typed = sid
+
+        if sid_typed in self.surgery_meta_df.index:
+            row = self.surgery_meta_df.loc[sid_typed]
         elif "surgery_id" in self.surgery_meta_df.columns:
-            row = self.surgery_meta_df[self.surgery_meta_df["surgery_id"] == sid]
+            row = self.surgery_meta_df[self.surgery_meta_df["surgery_id"] == sid_typed]
             row = row.iloc[0] if not row.empty else None
         else:
             row = None
@@ -263,18 +268,17 @@ class MainWindow(QMainWindow):
     def _goto_timestamp(self):
         """Jump slider to the timestamp entered by the user."""
         text = self.controls.goto_edit.text()
-        if not text:
+        if not text or not self._timestamps:
             return
         try:
-            # attempt numeric comparison first
-            target = float(text)
-        except ValueError:
-            target = text
-        if target in self._timestamps:
-            idx = self._timestamps.index(target)
+            target_val = float(text)
+            closest_ts = min(self._timestamps, key=lambda ts: abs(float(ts) - target_val))
+            idx = self._timestamps.index(closest_ts)
             self.timestamp_slider.setValue(idx)
             self._update_timestamp_label(idx)
             self.update_plots()
+        except (ValueError, IndexError):
+            return
 
     # -----------------------------------------------------
     # Playback helpers

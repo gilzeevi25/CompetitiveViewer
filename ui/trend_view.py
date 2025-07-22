@@ -72,6 +72,11 @@ class TrendView(QWidget):
 
     def refresh(self, data_dict: dict) -> None:
         """Update internal data and refresh the display."""
+        for widget in self._channel_plots.values():
+            widget.setParent(None)
+            widget.deleteLater()
+        self._channel_plots.clear()
+
         self.mep_df = data_dict.get("mep_df")
         self.ssep_upper_df = data_dict.get("ssep_upper_df")
         self.ssep_lower_df = data_dict.get("ssep_lower_df")
