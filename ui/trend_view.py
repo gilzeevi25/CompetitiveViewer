@@ -41,6 +41,7 @@ class TrendView(QWidget):
         self._surgery_id = None
         self._channel_order = []
 
+        self._visible_channels = []
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -62,7 +63,7 @@ class TrendView(QWidget):
         layout.addLayout(self.channel_grid)
 
         # Global summary plot
-        self.global_plot = BasePlotWidget()
+        self.global_plot = BasePlotWidget(self)
         self.global_legend = self.global_plot.plotItem.legend
         layout.addWidget(self.global_plot)
 
@@ -82,6 +83,10 @@ class TrendView(QWidget):
         """Update the channel ordering used for plotting."""
         self._channel_order = list(channels)
         self.update_view()
+
+    def set_visible_channels(self, channels: list) -> None:
+        """Set which channels should be displayed."""
+        self._visible_channels = list(channels)
 
     # -----------------------------------------------------
     # Internal helpers
@@ -106,6 +111,7 @@ class TrendView(QWidget):
             widget = item.widget()
             if widget is not None:
                 widget.setParent(None)
+                widget.deleteLater()
 
         self.global_plot.clear()
         if self.global_legend is not None:
@@ -125,6 +131,9 @@ class TrendView(QWidget):
         else:
             channels = sorted(unique_channels)
 
+        if self._visible_channels:
+            channels = [ch for ch in channels if ch in self._visible_channels]
+
         left_row = right_row = 0
         for channel in channels:
             subset = norm_df[norm_df["channel"] == channel]
@@ -133,7 +142,7 @@ class TrendView(QWidget):
             x = subset["timestamp"].to_list()
             y = subset["l1"].to_list()
 
-            plot = BasePlotWidget()
+            plot = BasePlotWidget(self)
             plot.plot(x, y, pen=pg.mkPen(width=2))
 
             title = str(channel)

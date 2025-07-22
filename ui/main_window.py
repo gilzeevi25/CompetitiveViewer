@@ -209,6 +209,7 @@ class MainWindow(QMainWindow):
         channels = [self.channel_list.item(i).text()
                     for i in range(self.channel_list.count())
                     if self.channel_list.item(i).checkState() == Qt.Checked]
+        self.trend_tab.set_visible_channels(channels)
         timestamp = None
         idx = self.timestamp_slider.value()
         if 0 <= idx < len(self._timestamps):
