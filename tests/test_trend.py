@@ -1,20 +1,21 @@
 import pytest
 import numpy as np
 import pandas as pd
-from ui.trend_view import calculate_p2p
+from ui.trend_view import calculate_l1
 
 
-def test_calculate_p2p_sine():
+def test_calculate_l1_simple():
     amp = 2.0
     rows = []
     steps = 10
     for i in range(steps):
         a = amp * i / (steps - 1)
-        values = np.sin(np.linspace(0, 2 * np.pi, 50)) * a
+        values = [-a, a]
         rows.append({"timestamp": i, "channel": "ch", "values": values})
     df = pd.DataFrame(rows)
-    out = calculate_p2p(df)
+    out = calculate_l1(df)
 
-    assert out["p2p"].max() == pytest.approx(amp * 2, rel=1e-2)
-    assert out["p2p"].min() == pytest.approx(0, abs=1e-8)
-    assert out["p2p"].mean() == pytest.approx(amp, rel=1e-2)
+    assert out["l1"].max() == pytest.approx(amp * 2, rel=1e-6)
+    assert out["l1"].min() == pytest.approx(0, abs=1e-8)
+    assert out["l1"].mean() == pytest.approx(amp, rel=1e-6)
+
