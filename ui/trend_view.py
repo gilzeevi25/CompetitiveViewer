@@ -3,28 +3,31 @@ from PyQt5.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QRadioButton,
-    QButtonGroup,
+    QGridLayout,
+    QComboBox,
     QLabel,
 )
 import pyqtgraph as pg
 from .plot_widgets import BasePlotWidget
 
 
-def calculate_p2p(df: pd.DataFrame) -> pd.DataFrame:
-    """Compute peak-to-peak amplitude for each timestamp/channel row."""
+def calculate_l1_norm(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute L1 norm of the signal for each timestamp/channel row."""
     if df is None or df.empty:
-        return pd.DataFrame(columns=["timestamp", "channel", "p2p"])
+        return pd.DataFrame(columns=["timestamp", "channel", "l1"])
 
     result = df[["timestamp", "channel", "values"]].copy()
-    result["p2p"] = result["values"].apply(
-        lambda arr: max(arr) - min(arr) if len(arr) > 0 else 0
+    result["l1"] = result["values"].apply(
+        lambda arr: float(sum(abs(v) for v in arr)) if len(arr) > 0 else 0.0
     )
-    return result[["timestamp", "channel", "p2p"]]
+    return result[["timestamp", "channel", "l1"]]
+
+
+
 
 
 class TrendView(QWidget):
-    """Widget for displaying peak-to-peak trends across time."""
+    """Widget for displaying L1-norm trends across time."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -39,34 +42,24 @@ class TrendView(QWidget):
     def _setup_ui(self) -> None:
         layout = QVBoxLayout(self)
 
-        # Radio buttons to select data source
-        radio_layout = QHBoxLayout()
-        self.mep_radio = QRadioButton("MEP")
-        self.ssep_radio = QRadioButton("SSEP")
-        self.mep_radio.setChecked(True)
-        group = QButtonGroup(self)
-        group.addButton(self.mep_radio)
-        group.addButton(self.ssep_radio)
-        self.mep_radio.toggled.connect(self.update_view)
-        self.ssep_radio.toggled.connect(self.update_view)
-        radio_layout.addWidget(self.mep_radio)
-        radio_layout.addWidget(self.ssep_radio)
-        layout.addLayout(radio_layout)
+        # Modality selector
+        selector_layout = QHBoxLayout()
+        selector_layout.addWidget(QLabel("Modality:"))
+        self.modality_combo = QComboBox()
+        self.modality_combo.addItems(["MEP", "SSEP_UPPER", "SSEP_LOWER"])
+        self.modality_combo.currentTextChanged.connect(self.update_view)
+        selector_layout.addWidget(self.modality_combo)
+        selector_layout.addStretch(1)
+        layout.addLayout(selector_layout)
 
-        # Plot widget
-        self.plot = BasePlotWidget()
-        self._legend = self.plot.plotItem.legend
-        layout.addWidget(self.plot)
+        # Layout for channel plots
+        self.channel_grid = QGridLayout()
+        layout.addLayout(self.channel_grid)
 
-        # Stats labels
-        stats_layout = QHBoxLayout()
-        self.min_label = QLabel("Min: N/A")
-        self.max_label = QLabel("Max: N/A")
-        self.mean_label = QLabel("Mean: N/A")
-        stats_layout.addWidget(self.min_label)
-        stats_layout.addWidget(self.max_label)
-        stats_layout.addWidget(self.mean_label)
-        layout.addLayout(stats_layout)
+        # Global summary plot
+        self.global_plot = BasePlotWidget()
+        self.global_legend = self.global_plot.plotItem.legend
+        layout.addWidget(self.global_plot)
 
     def refresh(self, data_dict: dict) -> None:
         """Update internal data and refresh the display."""
@@ -84,40 +77,34 @@ class TrendView(QWidget):
     # Internal helpers
     # -----------------------------------------------------
     def _current_dataframe(self) -> pd.DataFrame:
-        if self.mep_radio.isChecked():
+        mode = self.modality_combo.currentText()
+        if mode == "MEP":
             return self.mep_df
-        if self.ssep_radio.isChecked():
-            frames = []
-            if self.ssep_upper_df is not None:
-                frames.append(self.ssep_upper_df)
-            if self.ssep_lower_df is not None:
-                frames.append(self.ssep_lower_df)
-            if frames:
-                return pd.concat(frames, ignore_index=True)
+        if mode == "SSEP_UPPER":
+            return self.ssep_upper_df
+        if mode == "SSEP_LOWER":
+            return self.ssep_lower_df
         return None
 
     def update_view(self) -> None:
         df = self._current_dataframe()
-        self.plot.clear()
-        if self._legend is not None:
-            self._legend.clear()
+        # clear existing channel plots
+        while self.channel_grid.count():
+            item = self.channel_grid.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+
+        self.global_plot.clear()
+        if self.global_legend is not None:
+            self.global_legend.clear()
+
         if df is None or df.empty:
-            self.min_label.setText("Min: N/A")
-            self.max_label.setText("Max: N/A")
-            self.mean_label.setText("Mean: N/A")
             return
 
-        p2p_df = calculate_p2p(df)
+        norm_df = calculate_l1_norm(df)
 
-        # Compute stats
-        global_min = p2p_df["p2p"].min()
-        global_max = p2p_df["p2p"].max()
-        global_mean = p2p_df["p2p"].mean()
-        self.min_label.setText(f"Min: {global_min:.2f}")
-        self.max_label.setText(f"Max: {global_max:.2f}")
-        self.mean_label.setText(f"Mean: {global_mean:.2f}")
-
-        unique_channels = list(p2p_df["channel"].unique())
+        unique_channels = list(norm_df["channel"].unique())
         if self._channel_order:
             channels = [ch for ch in self._channel_order if ch in unique_channels]
             for ch in unique_channels:
@@ -126,10 +113,40 @@ class TrendView(QWidget):
         else:
             channels = sorted(unique_channels)
 
-        for idx, channel in enumerate(channels):
-            subset = p2p_df[p2p_df["channel"] == channel]
+        left_row = right_row = 0
+        for channel in channels:
+            subset = norm_df[norm_df["channel"] == channel]
+            if subset.empty:
+                continue
             x = subset["timestamp"].to_list()
-            y = subset["p2p"].to_list()
-            color = pg.intColor(idx, hues=len(channels))
-            self.plot.plot(x, y, pen=pg.mkPen(color, width=2), name=str(channel))
+            y = subset["l1"].to_list()
+
+            plot = BasePlotWidget()
+            plot.plot(x, y, pen=pg.mkPen(width=2))
+
+            title = str(channel)
+            mode = self.modality_combo.currentText()
+            if mode == "SSEP_UPPER":
+                title = f"Upper: {channel}"
+            elif mode == "SSEP_LOWER":
+                title = f"Lower: {channel}"
+            plot.plotItem.setTitle(title)
+
+            if str(channel).lower().startswith("r"):
+                col = 1
+                row = right_row
+                right_row += 1
+            else:
+                col = 0
+                row = left_row
+                left_row += 1
+
+            self.channel_grid.addWidget(plot, row, col)
+
+        # Global statistics
+        summary = norm_df.groupby("timestamp")["l1"].agg(["min", "max", "mean"])
+        x_vals = summary.index.to_list()
+        self.global_plot.plot(x_vals, summary["min"].to_list(), pen=pg.mkPen("y", width=2), name="Min")
+        self.global_plot.plot(x_vals, summary["max"].to_list(), pen=pg.mkPen("r", width=2), name="Max")
+        self.global_plot.plot(x_vals, summary["mean"].to_list(), pen=pg.mkPen("c", width=2), name="Avg")
 
