@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget,
@@ -18,9 +19,12 @@ def calculate_l1_norm(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame(columns=["timestamp", "channel", "l1"])
 
     result = df[["timestamp", "channel", "values"]].copy()
-    result["l1"] = result["values"].apply(
-        lambda arr: float(sum(abs(v) for v in arr)) if len(arr) > 0 else 0.0
-    )
+
+    def _l1(arr):
+        np_arr = np.asarray(arr, dtype=float)
+        return float(np.sum(np.abs(np_arr))) if np_arr.size > 0 else 0.0
+
+    result["l1"] = result["values"].apply(_l1)
     return result[["timestamp", "channel", "l1"]]
 
 
