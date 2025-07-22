@@ -70,6 +70,8 @@ class MainWindow(QMainWindow):
         self.channel_list.dropped.connect(self._emit_channel_order)
 
         self.channelsReordered.connect(self.trend_tab.set_channel_order)
+        self.trend_tab.modalityChanged.connect(lambda _:
+                                               self._update_channels_for_current_tab())
 
         self.date_label = self.controls.date_label
         self.protocol_label = self.controls.protocol_label
@@ -116,11 +118,14 @@ class MainWindow(QMainWindow):
         self._update_channels_for_current_tab()
         self._update_timestamp_slider()
         self._update_surgery_meta_label()
+        if self.surgery_combo.count():
+            self.trend_tab.set_current_surgery(self.surgery_combo.currentText())
         self.update_plots()
 
     def on_surgery_changed(self, value):
         self._update_timestamp_slider()
         self._update_surgery_meta_label()
+        self.trend_tab.set_current_surgery(value)
         self.update_plots()
 
     def on_timestamp_changed(self, value):
@@ -156,9 +161,22 @@ class MainWindow(QMainWindow):
         return None
 
     def _update_channels_for_current_tab(self):
-        if self.tabs.currentIndex() == 0:
+        tab = self.tabs.currentWidget()
+        if tab == self.mep_view:
             df = self.mep_df
             channels = sorted(df["channel"].unique()) if df is not None else []
+        elif tab == self.trend_tab:
+            mode = self.trend_tab.modality_combo.currentText()
+            if mode == "MEP":
+                df = self.mep_df
+            elif mode == "SSEP_UPPER":
+                df = self.ssep_upper_df
+            else:
+                df = self.ssep_lower_df
+            if df is not None:
+                channels = sorted(df["channel"].unique())
+            else:
+                channels = []
         else:
             channels = set()
             if self.ssep_upper_df is not None:
@@ -191,6 +209,7 @@ class MainWindow(QMainWindow):
         channels = [self.channel_list.item(i).text()
                     for i in range(self.channel_list.count())
                     if self.channel_list.item(i).checkState() == Qt.Checked]
+        self.trend_tab.set_visible_channels(channels)
         timestamp = None
         idx = self.timestamp_slider.value()
         if 0 <= idx < len(self._timestamps):
@@ -198,9 +217,9 @@ class MainWindow(QMainWindow):
         self._update_timestamp_label(idx)
         surgery = self.surgery_combo.currentText()
 
-        if self.tabs.currentIndex() == 0:
+        if self.tabs.currentWidget() == self.mep_view:
             self.mep_view.update_view(self.mep_df, surgery, timestamp, channels)
-        else:
+        elif self.tabs.currentWidget() == self.ssep_view:
             self.ssep_view.update_view(
                 self.ssep_upper_df,
                 self.ssep_lower_df,
@@ -208,6 +227,8 @@ class MainWindow(QMainWindow):
                 timestamp,
                 channels,
             )
+        else:
+            self.trend_tab.update_view()
 
     def _update_surgery_meta_label(self):
         if self.surgery_meta_df is None or self.surgery_meta_df.empty:
