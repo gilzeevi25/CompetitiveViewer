@@ -42,6 +42,7 @@ class TrendView(QWidget):
         self._channel_order = []
 
         self._visible_channels = []
+        self._channel_plots = {}
         self._setup_ui()
 
     def _setup_ui(self) -> None:
@@ -105,13 +106,9 @@ class TrendView(QWidget):
         df = self._current_dataframe()
         if df is not None and self._surgery_id is not None:
             df = df[df["surgery_id"] == self._surgery_id]
-        # clear existing channel plots
+        # clear layout positions without deleting widgets
         while self.channel_grid.count():
-            item = self.channel_grid.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.setParent(None)
-                widget.deleteLater()
+            self.channel_grid.takeAt(0)
 
         self.global_plot.clear()
         if self.global_legend is not None:
@@ -135,6 +132,7 @@ class TrendView(QWidget):
             channels = [ch for ch in channels if ch in self._visible_channels]
 
         left_row = right_row = 0
+        used = set()
         for channel in channels:
             subset = norm_df[norm_df["channel"] == channel]
             if subset.empty:
@@ -142,7 +140,10 @@ class TrendView(QWidget):
             x = subset["timestamp"].to_list()
             y = subset["l1"].to_list()
 
-            plot = BasePlotWidget(self)
+            if channel not in self._channel_plots:
+                self._channel_plots[channel] = BasePlotWidget(self)
+            plot = self._channel_plots[channel]
+            plot.clear()
             plot.plot(x, y, pen=pg.mkPen(width=2))
 
             title = str(channel)
@@ -163,6 +164,13 @@ class TrendView(QWidget):
                 left_row += 1
 
             self.channel_grid.addWidget(plot, row, col)
+            plot.show()
+            used.add(channel)
+
+        # hide unused plots
+        for ch, widget in self._channel_plots.items():
+            if ch not in used:
+                widget.hide()
 
         # Global statistics
         summary = norm_df.groupby("timestamp")["l1"].agg(["min", "max", "mean"])
