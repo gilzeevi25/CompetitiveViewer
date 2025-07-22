@@ -24,6 +24,32 @@ def calculate_l1_norm(df: pd.DataFrame) -> pd.DataFrame:
     return result[["timestamp", "channel", "l1"]]
 
 
+def calculate_p2p(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute peak-to-peak amplitude for each timestamp/channel row."""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["timestamp", "channel", "p2p"])
+
+    result = df[["timestamp", "channel", "values"]].copy()
+    result["p2p"] = result["values"].apply(
+        lambda arr: float(max(arr) - min(arr)) if len(arr) > 0 else 0.0
+    )
+    return result[["timestamp", "channel", "p2p"]]
+
+
+def calculate_rms(df: pd.DataFrame) -> pd.DataFrame:
+    """Compute RMS of the signal for each timestamp/channel row."""
+    if df is None or df.empty:
+        return pd.DataFrame(columns=["timestamp", "channel", "rms"])
+
+    result = df[["timestamp", "channel", "values"]].copy()
+    result["rms"] = result["values"].apply(
+        lambda arr: float((sum(v * v for v in arr) / len(arr)) ** 0.5)
+        if len(arr) > 0
+        else 0.0
+    )
+    return result[["timestamp", "channel", "rms"]]
+
+
 
 
 
@@ -58,6 +84,16 @@ class TrendView(QWidget):
         selector_layout.addWidget(self.modality_combo)
         selector_layout.addStretch(1)
         layout.addLayout(selector_layout)
+
+        # Trend method selector
+        method_layout = QHBoxLayout()
+        method_layout.addWidget(QLabel("Method:"))
+        self.method_combo = QComboBox()
+        self.method_combo.addItems(["L1", "P2P", "RMS"])
+        self.method_combo.currentTextChanged.connect(self.update_view)
+        method_layout.addWidget(self.method_combo)
+        method_layout.addStretch(1)
+        layout.addLayout(method_layout)
 
         # Layout for channel plots
         self.channel_grid = QGridLayout()
@@ -104,10 +140,12 @@ class TrendView(QWidget):
             return self.ssep_lower_df
         return None
 
-    def update_view(self) -> None:
+    def update_view(self, *args, end_timestamp=None) -> None:
         df = self._current_dataframe()
         if df is not None and self._surgery_id is not None:
             df = df[df["surgery_id"] == self._surgery_id]
+        if end_timestamp is not None and df is not None and not df.empty:
+            df = df[df["timestamp"] <= end_timestamp]
         # clear layout positions without deleting widgets
         while self.channel_grid.count():
             self.channel_grid.takeAt(0)
@@ -119,7 +157,16 @@ class TrendView(QWidget):
         if df is None or df.empty:
             return
 
-        norm_df = calculate_l1_norm(df)
+        method = self.method_combo.currentText()
+        if method == "L1":
+            norm_df = calculate_l1_norm(df)
+            value_col = "l1"
+        elif method == "P2P":
+            norm_df = calculate_p2p(df)
+            value_col = "p2p"
+        else:
+            norm_df = calculate_rms(df)
+            value_col = "rms"
 
         unique_channels = list(norm_df["channel"].unique())
         if self._channel_order:
@@ -141,7 +188,7 @@ class TrendView(QWidget):
             if subset.empty:
                 continue
             x = subset["timestamp"].to_list()
-            y = subset["l1"].to_list()
+            y = subset[value_col].to_list()
 
             if channel not in self._channel_plots:
                 self._channel_plots[channel] = BasePlotWidget(self)
@@ -191,7 +238,7 @@ class TrendView(QWidget):
             self.channel_grid.setColumnStretch(1, 0)
 
         # Global statistics
-        summary = norm_df.groupby("timestamp")["l1"].agg(["min", "max", "mean"])
+        summary = norm_df.groupby("timestamp")[value_col].agg(["min", "max", "mean"])
         x_vals = summary.index.to_list()
         self.global_plot.plot(x_vals, summary["min"].to_list(), pen=pg.mkPen("y", width=2), name="Min")
         self.global_plot.plot(x_vals, summary["max"].to_list(), pen=pg.mkPen("r", width=2), name="Max")

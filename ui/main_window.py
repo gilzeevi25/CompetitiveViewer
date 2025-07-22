@@ -228,7 +228,7 @@ class MainWindow(QMainWindow):
                 channels,
             )
         else:
-            self.trend_tab.update_view()
+            self.trend_tab.update_view(end_timestamp=timestamp)
 
     def _update_surgery_meta_label(self):
         if self.surgery_meta_df is None or self.surgery_meta_df.empty:
