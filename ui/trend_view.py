@@ -61,6 +61,8 @@ class TrendView(QWidget):
 
         # Layout for channel plots
         self.channel_grid = QGridLayout()
+        self.channel_grid.setColumnStretch(0, 1)
+        self.channel_grid.setColumnStretch(1, 1)
         layout.addLayout(self.channel_grid)
 
         # Global summary plot
@@ -133,6 +135,7 @@ class TrendView(QWidget):
 
         left_row = right_row = 0
         used = set()
+        used_cols = {0: False, 1: False}
         for channel in channels:
             subset = norm_df[norm_df["channel"] == channel]
             if subset.empty:
@@ -162,6 +165,7 @@ class TrendView(QWidget):
                 col = 0
                 row = left_row
                 left_row += 1
+            used_cols[col] = True
 
             self.channel_grid.addWidget(plot, row, col)
             plot.show()
@@ -171,6 +175,20 @@ class TrendView(QWidget):
         for ch, widget in self._channel_plots.items():
             if ch not in used:
                 widget.hide()
+
+        # adjust column stretch depending on which columns contain widgets
+        if used_cols[0] and used_cols[1]:
+            self.channel_grid.setColumnStretch(0, 1)
+            self.channel_grid.setColumnStretch(1, 1)
+        elif used_cols[0]:
+            self.channel_grid.setColumnStretch(0, 1)
+            self.channel_grid.setColumnStretch(1, 0)
+        elif used_cols[1]:
+            self.channel_grid.setColumnStretch(0, 0)
+            self.channel_grid.setColumnStretch(1, 1)
+        else:
+            self.channel_grid.setColumnStretch(0, 1)
+            self.channel_grid.setColumnStretch(1, 0)
 
         # Global statistics
         summary = norm_df.groupby("timestamp")["l1"].agg(["min", "max", "mean"])
