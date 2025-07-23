@@ -1,5 +1,4 @@
-# Core GUI framework
-PyQt5==5.15.9
+# Core GUI framework (Tkinter is built-in)
 
 # Data handling
 pandas==2.2.2
@@ -7,9 +6,6 @@ numpy==1.26.4
 
 # Plotting
 matplotlib==3.8.4
-
-# Optional: High-performance signal plotting (if you choose PyQtGraph)
-pyqtgraph==0.13.3
 
 # Optional: For saving logs or enhanced config
 tqdm==4.66.4

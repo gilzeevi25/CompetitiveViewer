@@ -1,15 +1,14 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QDialog
-
-from ui.launch_dialog import LaunchDialog
-from ui.main_window import MainWindow
+import tkinter as tk
+from tkui.launch_dialog import LaunchDialog
+from tkui.main_window import MainWindow
 
 
 def main() -> None:
-    app = QApplication(sys.argv)
-    dialog = LaunchDialog()
-    if dialog.exec_() != QDialog.Accepted:
-        sys.exit(0)
+    root = tk.Tk()
+    root.withdraw()
+    dialog = LaunchDialog(root)
+    if not dialog.exec_():
+        return
 
     window = MainWindow()
     if getattr(dialog, "mep_df", None) is not None:
@@ -19,13 +18,7 @@ def main() -> None:
             dialog.ssep_lower_df,
             dialog.surgery_meta_df,
         )
-        window.trend_tab.refresh({
-            "mep_df": dialog.mep_df,
-            "ssep_upper_df": dialog.ssep_upper_df,
-            "ssep_lower_df": dialog.ssep_lower_df,
-        })
-    window.show()
-    sys.exit(app.exec_())
+    window.run()
 
 
 if __name__ == "__main__":
