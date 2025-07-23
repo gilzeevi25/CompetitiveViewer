@@ -1,12 +1,8 @@
-import os
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
-
-# Ensure Qt runs headless during tests
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 @pytest.fixture
 def tiny_pickle(tmp_path: Path) -> str:

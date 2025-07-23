@@ -1,5 +1,9 @@
 # CompetitiveViewer
 
+The viewer has been migrated from PyQt5 to a minimal Tkinter interface. The
+functionality is simplified but the data loading and trend calculations remain
+the same.
+
 
 ## Packing to EXE
 

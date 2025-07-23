@@ -1,17 +1,14 @@
-import sys
-from PyQt5.QtWidgets import QApplication, QDialog
+"""Entry point for the Tkinter based viewer."""
 
-from ui.launch_dialog import LaunchDialog
-from ui.main_window import MainWindow
+from tkui.launch_dialog import LaunchDialog
+from tkui.main_window import MainWindow
 
 
 def main() -> None:
-    app = QApplication(sys.argv)
-    dialog = LaunchDialog()
-    if dialog.exec_() != QDialog.Accepted:
-        sys.exit(0)
-
     window = MainWindow()
+    dialog = LaunchDialog(window)
+    dialog.select_file()
+
     if getattr(dialog, "mep_df", None) is not None:
         window.load_data(
             dialog.mep_df,
@@ -19,13 +16,7 @@ def main() -> None:
             dialog.ssep_lower_df,
             dialog.surgery_meta_df,
         )
-        window.trend_tab.refresh({
-            "mep_df": dialog.mep_df,
-            "ssep_upper_df": dialog.ssep_upper_df,
-            "ssep_lower_df": dialog.ssep_lower_df,
-        })
     window.show()
-    sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
