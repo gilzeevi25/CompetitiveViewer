@@ -1,5 +1,8 @@
 # CompetitiveViewer
 
+The graphical interface has been migrated to **Tkinter**. The application can
+be launched with `python run_app.py` which opens a small Tkinter based viewer.
+
 
 ## Packing to EXE
 
