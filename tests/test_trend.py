@@ -1,7 +1,7 @@
 import pytest
 import math
 import pandas as pd
-from ui.trend_view import calculate_l1_norm
+from tkui.trend_view import calculate_l1_norm
 
 
 def test_calculate_l1_norm_sine():
