@@ -26,8 +26,15 @@ class CustomPlotMenu(QtWidgets.QMenu):
             exporter.export(path)
 
     def _copy_csv(self):
-        # Placeholder for CSV export logic
-        pass
+        lines = []
+        for item in self._plot_widget.listDataItems():
+            if not item.isVisible():
+                continue
+            x, y = item.getData()
+            for xv, yv in zip(x, y):
+                lines.append(f"{xv},{yv}")
+        if lines:
+            QtWidgets.QApplication.clipboard().setText("\n".join(lines))
 
 
 class BasePlotWidget(pg.PlotWidget):

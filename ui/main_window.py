@@ -293,8 +293,8 @@ class MainWindow(QMainWindow):
         except ValueError:
             speed = 1.0
         interval = int(self._play_interval_ms / speed)
-        if interval <= 0:
-            interval = 1
+        if interval < 30:
+            interval = 30
         self.play_timer.start(interval)
 
     def pause_playback(self):

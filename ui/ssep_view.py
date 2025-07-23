@@ -69,7 +69,8 @@ class SsepView(QWidget):
                 baseline = row["baseline_values"]
 
                 x_values = [i / row["signal_rate"] for i in range(len(values))]
-                x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
+                baseline_sr = row.get("baseline_signal_rate", row["signal_rate"])
+                x_baseline = [i / baseline_sr for i in range(len(baseline))]
                 y_offset = idx * offset_step
 
                 pen = SSEP_U_PEN if region == "Upper" else SSEP_L_PEN
