@@ -1,36 +1,33 @@
-from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QPushButton, QLabel, QFileDialog
-)
+import tkinter as tk
+from tkinter import filedialog, messagebox
 
 from src import data_loader
 
 
-class LaunchDialog(QDialog):
-    """Modal dialog prompting the user to select a pickle file."""
+class LaunchDialog:
+    """Simple dialog for selecting a pickle file using Tkinter."""
 
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self):
         self.mep_df = None
         self.ssep_upper_df = None
         self.ssep_lower_df = None
         self.surgery_meta_df = None
-        self.setWindowTitle("Select Data File")
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Choose a .pkl file to load"))
-        open_btn = QPushButton("Open")
-        open_btn.clicked.connect(self.select_file)
-        layout.addWidget(open_btn)
 
-    def select_file(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Select Data File",
-            "",
-            "Pickle Files (*.pkl)"
-        )
+    def select_file(self, path: str | None = None) -> bool:
+        """Load the provided file or open a dialog to choose one."""
         if not path:
-            return
-
+            try:
+                root = tk.Tk()
+                root.withdraw()
+                path = filedialog.askopenfilename(
+                    title="Select Data File",
+                    filetypes=[("Pickle Files", "*.pkl")],
+                )
+                root.destroy()
+            except tk.TclError:
+                return False
+        if not path:
+            return False
         try:
             (
                 self.mep_df,
@@ -38,8 +35,17 @@ class LaunchDialog(QDialog):
                 self.ssep_lower_df,
                 self.surgery_meta_df,
             ) = data_loader.load_signals(path)
-            self.accept()
+            return True
         except (FileNotFoundError, KeyError) as e:
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.critical(self, "Error Loading File", f"An error occurred:\n{e}")
+            try:
+                root = tk.Tk()
+                root.withdraw()
+                messagebox.showerror("Error Loading File", str(e))
+                root.destroy()
+            except tk.TclError:
+                pass
+            return False
 
+    # Compatibility shim for old API
+    def exec_(self) -> int:
+        return int(self.select_file())
