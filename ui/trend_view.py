@@ -20,11 +20,9 @@ def calculate_l1_norm(df: pd.DataFrame) -> pd.DataFrame:
 
     result = df[["timestamp", "channel", "values"]].copy()
 
-    def _l1(arr):
-        np_arr = np.asarray(arr, dtype=float)
-        return float(np.sum(np.abs(np_arr))) if np_arr.size > 0 else 0.0
-
-    result["l1"] = result["values"].apply(_l1)
+    result["l1"] = result["values"].map(
+        lambda arr: 0.0 if arr is None else np.abs(arr, dtype=float).sum()
+    )
     return result[["timestamp", "channel", "l1"]]
 
 
@@ -57,7 +55,9 @@ class TrendView(QWidget):
         selector_layout.addWidget(QLabel("Modality:"))
         self.modality_combo = QComboBox()
         self.modality_combo.addItems(["MEP", "SSEP_UPPER", "SSEP_LOWER"])
-        self.modality_combo.currentTextChanged.connect(self.update_view)
+        self.modality_combo.currentTextChanged.connect(
+            lambda _mode: self.update_view()
+        )
         self.modality_combo.currentTextChanged.connect(self.modalityChanged.emit)
         selector_layout.addWidget(self.modality_combo)
         selector_layout.addStretch(1)
@@ -71,7 +71,6 @@ class TrendView(QWidget):
 
         # Global summary plot
         self.global_plot = BasePlotWidget(self)
-        self.global_legend = self.global_plot.plotItem.legend
         layout.addWidget(self.global_plot)
 
     def refresh(self, data_dict: dict) -> None:
@@ -119,11 +118,15 @@ class TrendView(QWidget):
             df = df[df["surgery_id"] == self._surgery_id]
         # clear layout positions without deleting widgets
         while self.channel_grid.count():
-            self.channel_grid.takeAt(0)
+            item = self.channel_grid.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
 
         self.global_plot.clear()
-        if self.global_legend is not None:
-            self.global_legend.clear()
+        legend = self.global_plot.plotItem.legend
+        if legend is not None:
+            legend.clear()
 
         if df is None or df.empty:
             return

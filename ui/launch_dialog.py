@@ -39,7 +39,7 @@ class LaunchDialog(QDialog):
                 self.surgery_meta_df,
             ) = data_loader.load_signals(path)
             self.accept()
-        except (FileNotFoundError, KeyError) as e:
+        except Exception as e:
             from PyQt5.QtWidgets import QMessageBox
             QMessageBox.critical(self, "Error Loading File", f"An error occurred:\n{e}")
 

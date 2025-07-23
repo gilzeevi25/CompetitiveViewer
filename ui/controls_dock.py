@@ -1,4 +1,5 @@
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5 import QtGui
 from PyQt5.QtWidgets import (
     QDockWidget,
     QWidget,
@@ -66,6 +67,7 @@ class ControlsDock(QDockWidget):
         goto_layout = QHBoxLayout()
         self.goto_edit = QLineEdit()
         self.goto_edit.setPlaceholderText("Jump to timestamp")
+        self.goto_edit.setValidator(QtGui.QIntValidator())
         self.goto_button = QPushButton("Go")
         goto_layout.addWidget(self.goto_edit)
         goto_layout.addWidget(self.goto_button)

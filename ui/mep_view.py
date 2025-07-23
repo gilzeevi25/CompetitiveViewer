@@ -58,7 +58,8 @@ class MepView(QWidget):
             baseline = row["baseline_values"]
 
             x_values = [i / row["signal_rate"] for i in range(len(values))]
-            x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
+            baseline_sr = row.get("baseline_signal_rate", row["signal_rate"])
+            x_baseline = [i / baseline_sr for i in range(len(baseline))]
             y_offset = idx * offset_step
 
             self.left_plot.plot(x_values, [v + y_offset for v in values], pen=MEP_PEN)
@@ -76,7 +77,8 @@ class MepView(QWidget):
             baseline = row["baseline_values"]
 
             x_values = [i / row["signal_rate"] for i in range(len(values))]
-            x_baseline = [i / row["baseline_signal_rate"] for i in range(len(baseline))]
+            baseline_sr = row.get("baseline_signal_rate", row["signal_rate"])
+            x_baseline = [i / baseline_sr for i in range(len(baseline))]
             y_offset = idx * offset_step
 
             self.right_plot.plot(x_values, [v + y_offset for v in values], pen=MEP_PEN)
